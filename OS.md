@@ -3,26 +3,27 @@
 
 
 Ci sono diversi sistemi operativi open-source più semplici e compatti rispetto a OS161 e Linux che potresti considerare per l'analisi comparativa. Ecco alcuni esempi:
-FreeRTOS: FreeRTOS è un sistema operativo in tempo reale open-source progettato per sistemi embedded. È noto per la sua leggerezza e il basso impatto sulle risorse. È ampiamente utilizzato in dispositivi come microcontrollori e microprocessori.
-TinyOS: TinyOS è un sistema operativo open-source orientato ai sensori, progettato per reti di sensori wireless e dispositivi a bassa potenza. È ottimizzato per applicazioni IoT e dispone di un'architettura modulare.
+- **FreeRTOS**: FreeRTOS è un sistema operativo in tempo reale open-source progettato per sistemi embedded. È noto per la sua leggerezza e il basso impatto sulle risorse. È ampiamente utilizzato in dispositivi come microcontrollori e microprocessori.
+- **TinyOS**: TinyOS è un sistema operativo open-source orientato ai sensori, progettato per reti di sensori wireless e dispositivi a bassa potenza. È ottimizzato per applicazioni IoT e dispone di un'architettura modulare.
 µC/OS-II e µC/OS-III: µC/OS-II e µC/OS-III sono sistemi operativi in tempo reale progettati per sistemi embedded. µC/OS-II è una versione più leggera, mentre µC/OS-III offre una maggiore scalabilità e funzionalità avanzate.
-Contiki: Contiki è un sistema operativo open-source progettato per reti di sensori e dispositivi IoT. È noto per la sua efficienza in termini di memoria e risorse, ed è adatto per sistemi a basso consumo energetico.
-RTEMS: RTEMS è un sistema operativo in tempo reale open-source con un'ampia gamma di funzionalità. È progettato per sistemi embedded e applicazioni critiche e supporta una varietà di architetture hardware.
-Nuttx: Nuttx è un sistema operativo in tempo reale e open-source con un design leggero e modulare. È adatto per sistemi embedded e offre supporto per diverse architetture.
-ChibiOS/RT: ChibiOS/RT è un sistema operativo in tempo reale open-source progettato per sistemi embedded. È conosciuto per le sue prestazioni e la sua architettura modulare.
+- **Contiki**: Contiki è un sistema operativo open-source progettato per reti di sensori e dispositivi IoT. È noto per la sua efficienza in termini di memoria e risorse, ed è adatto per sistemi a basso consumo energetico.
+- **RTEMS**: RTEMS è un sistema operativo in tempo reale open-source con un'ampia gamma di funzionalità. È progettato per sistemi embedded e applicazioni critiche e supporta una varietà di architetture hardware.
+- **Nuttx**: Nuttx è un sistema operativo in tempo reale e open-source con un design leggero e modulare. È adatto per sistemi embedded e offre supporto per diverse architetture.
+- **ChibiOS/RT**: ChibiOS/RT è un sistema operativo in tempo reale open-source progettato per sistemi embedded. È conosciuto per le sue prestazioni e la sua architettura modulare.
 
-Nachos:
-Vantaggi:
+### Nachos
+
+- **Vantaggi**:
 Nachos è stato sviluppato all'Università di Berkeley, quindi potrebbe avere alcune somiglianze concettuali con OS161, che è spesso utilizzato in contesti accademici.
 La struttura modulare di Nachos potrebbe facilitare l'implementazione e l'analisi delle diverse caratteristiche da valutare.
 È progettato per supportare sistemi operativi embedded e generali, il che lo rende adatto alle esigenze del tuo progetto.
-Svantaggi:
+- **Svantaggi**:
 Potrebbe essere più complesso rispetto a OS161, il che richiederebbe un'ulteriore curva di apprendimento.
-JOS (J Operating System):
-Vantaggi:
+### JOS (J Operating System):
+- **Vantaggi**:
 JOS è stato sviluppato presso il MIT e potrebbe quindi condividere alcune somiglianze concettuali con OS161, che ha radici accademiche simili.
 Potrebbe essere progettato per la comprensione dei principi dei sistemi operativi, quindi potrebbe essere adattabile alle tue esigenze di analisi.
-Svantaggi:
+- **Svantaggi**:
 Potrebbe essere più complesso rispetto ad altri sistemi operativi accademici, richiedendo quindi una curva di apprendimento più lunga.
 
 ---- Aggiornamento 14-08
@@ -35,84 +36,95 @@ https://homes.di.unimi.it/sisop/lucidi1415/Dispensa.pdf
 --- Aggiornamento 22/08/2023
 
 Sia OS/161 che NACHOS sono sistemi operativi educativi utilizzati per scopi didattici nel campo dei sistemi operativi. Entrambi offrono un ambiente per esplorare i concetti fondamentali dei sistemi operativi, ma ci sono differenze significative nel modo in cui gestiscono le system call (chiamate di sistema). Di seguito, confronto come funzionano le system call in OS/161 e NACHOS:
-OS/161:
-Gestione delle System Call: In OS/161, le system call vengono gestite in modalità kernel. Quando un'applicazione utente esegue una system call, il controllo passa al kernel.
-Switch di Modalità: Quando avviene una system call, OS/161 passa dalla modalità utente alla modalità kernel, nota anche come "modalità privilegiata". Questo è reso possibile grazie alle istruzioni specifiche delle architetture dei processori moderni.
-Interrupt e Traps: Per passare dalla modalità utente alla modalità kernel, OS/161 fa uso di interruzioni o trappole. L'applicazione utente genera un'interruzione o trappola attraverso un'istruzione di assembly, e il controllo passa al gestore di interruzioni del kernel.
-Gestione del Contesto: Quando il kernel gestisce una system call, salva il contesto dell'applicazione utente (registri, puntatori di stack, ecc.), esegue il codice della system call e poi ripristina il contesto dell'applicazione utente prima di restituire il controllo all'applicazione.
-NACHOS:
-Gestione delle System Call: NACHOS gestisce le system call in modo simile a OS/161. Le chiamate di sistema vengono gestite dal kernel di NACHOS.
+#### OS/161:
+- **Gestione delle System Call**: In OS/161, le system call vengono gestite in modalità kernel. Quando un'applicazione utente esegue una system call, il controllo passa al kernel.
+- **Switch di Modalità**: Quando avviene una system call, OS/161 passa dalla modalità utente alla modalità kernel, nota anche come "modalità privilegiata". Questo è reso possibile grazie alle istruzioni specifiche delle architetture dei processori moderni.
+- **Interrupt e Traps**: Per passare dalla modalità utente alla modalità kernel, OS/161 fa uso di interruzioni o trappole. L'applicazione utente genera un'interruzione o trappola attraverso un'istruzione di assembly, e il controllo passa al gestore di interruzioni del kernel.
+- **Gestione del Contesto**: Quando il kernel gestisce una system call, salva il contesto dell'applicazione utente (registri, puntatori di stack, ecc.), esegue il codice della system call e poi ripristina il contesto dell'applicazione utente prima di restituire il controllo all'applicazione.
+#### NACHOS:
+- **Gestione delle System Call**: NACHOS gestisce le system call in modo simile a OS/161. Le chiamate di sistema vengono gestite dal kernel di NACHOS.
 Switch di Modalità: Anche NACHOS effettua un passaggio dalla modalità utente alla modalità kernel quando viene eseguita una system call.
-Interrupt e Traps: Come OS/161, NACHOS fa uso di interruzioni o trappole per passare dalla modalità utente alla modalità kernel durante l'esecuzione di una system call.
-Gestione del Contesto: NACHOS segue un approccio simile a OS/161 nel salvare e ripristinare il contesto durante la transizione tra modalità utente e modalità kernel.
+- **Interrupt e Traps**: Come OS/161, NACHOS fa uso di interruzioni o trappole per passare dalla modalità utente alla modalità kernel durante l'esecuzione di una system call.
+- **Gestione del Contesto**: NACHOS segue un approccio simile a OS/161 nel salvare e ripristinare il contesto durante la transizione tra modalità utente e modalità kernel.
 
 
 
 
 In OS/161, le informazioni sulle chiamate di sistema sono organizzate all'interno di tabelle e strutture dati specifiche. Vediamo come funziona nel dettaglio:
-Tabella delle Chiamate di Sistema: 
+#### Tabella delle Chiamate di Sistema: 
 OS/161 utilizza una tabella delle chiamate di sistema (system call table) per associare numeri di chiamate di sistema alle funzioni del kernel corrispondenti. Questa tabella è spesso definita nel codice del kernel e può essere implementata come un array di puntatori a funzione.
 Esempio di definizione di una tabella delle chiamate di sistema in OS/161:
+
+```c
 // Definizione della tabella delle chiamate di sistema in OS/161
 typedef int (*syscall_function_t)(void);
 syscall_function_t syscall_table[SYSCALL_COUNT];
-
-Gestione delle Chiamate di Sistema: 
+```
+#### Gestione delle Chiamate di Sistema: 
 Ogni numero di chiamata di sistema è associato a una funzione specifica nel kernel. Ecco un esempio semplificato di come potrebbe apparire la definizione e l'inizializzazione della tabella delle chiamate di sistema in OS/161:
+
+```c
 // Definizione delle chiamate di sistema in OS/161
 #define SYS_HALT 0
 #define SYS_READ 2
 // ... altre chiamate di sistema ...
-
 // Inizializzazione della tabella delle chiamate di sistema
 syscall_table[SYS_HALT] = sys_halt;
 syscall_table[SYS_READ] = sys_read;
 // ... inizializzazione di altre chiamate di sistema ...
-
+```
 Esecuzione delle Chiamate di Sistema: 
 volta che una chiamata di sistema è stata richiesta dall'applicazione utente, il kernel esegue la funzione associata all'interno della tabella delle chiamate di sistema.
 Esempio di implementazione semplificata di sys_read in OS/161:
-
+```c
 int sys_read(int filehandle, char *buf, size_t size) {
     // Implementazione della lettura dal filehandle nel buffer
     // Restituzione del numero di byte letti o di un valore di errore }
-Gestione del Contesto: 
+```
+#### Gestione del Contesto: 
 Durante il passaggio tra modalità utente e kernel, il kernel salva e ripristina il contesto del processo corrente. Questo può includere la gestione dei registri, degli stack e altre informazioni cruciali.
 Ad esempio, durante il passaggio dalla modalità utente alla modalità kernel, il kernel può salvare il contesto dell'applicazione utente:
+```c
 void enter_kernel_mode() {
     // Salva lo stato del contesto dell'applicazione utente
     // Esegui il passaggio alla modalità kernel
     // Gestisci la chiamata di sistema
     // Ripristina lo stato del contesto dell'applicazione utente
 }
-
+```
 Le informazioni sulle chiamate di sistema, come la tabella delle chiamate di sistema e le funzioni associate, sono generalmente definite e organizzate all'interno del codice del kernel. Le chiamate di sistema possono variare in base all'implementazione specifica di OS/161 e alla versione del sistema operativo utilizzata.
 
 
 In OS/161, le chiamate di sistema sono una parte fondamentale dell'interazione tra le applicazioni utente e il kernel del sistema operativo. Le chiamate di sistema consentono alle applicazioni utente di richiedere servizi o risorse dal kernel, come la lettura/scrittura su file, la creazione di processi, l'allocazione di memoria, ecc. Ecco come vengono gestite le chiamate di sistema in OS/161:
-Interruzioni (Trappole): Quando un'applicazione utente richiede un servizio del kernel attraverso una chiamata di sistema, il controllo passa dalla modalità utente alla modalità kernel. Questo passaggio avviene attraverso una trappola o un'interruzione. L'applicazione utente emette un'istruzione di assembly che genera un'interruzione o una trappola specifica per una chiamata di sistema.
-Interrupt Handler del Kernel: Una volta che l'interruzione o la trappola viene generata, il controllo passa all'interrupt handler del kernel. Questo handler è una porzione di codice del kernel che gestisce gli eventi generati dalle interruzioni e dalle trappole. Nel caso delle chiamate di sistema, l'interrupt handler riconosce il tipo di chiamata richiesta e la smista al gestore appropriato.
-Gestione delle Chiamate di Sistema: Il kernel di OS/161 ha una tabella delle chiamate di sistema (system call table) che associa i numeri delle chiamate di sistema alle funzioni del kernel corrispondenti. Ad esempio, il numero 0 potrebbe essere associato a una chiamata di sistema per terminare un processo, il numero 1 per scrivere su un file, il numero 2 per leggere da un file, e così via.
-Esecuzione delle Chiamate di Sistema: Una volta individuata la chiamata di sistema richiesta e associata alla sua funzione corrispondente, il kernel esegue il codice della funzione di chiamata di sistema. Questo può comportare la modifica dello stato del processo, l'allocazione di memoria, l'interazione con dispositivi di I/O e altro ancora.
-Restituzione dei Risultati: Dopo l'esecuzione della chiamata di sistema, il controllo ritorna all'applicazione utente, e il risultato della chiamata di sistema (ad esempio, il valore restituito da una funzione di lettura/scrittura) può essere restituito all'applicazione.
-Ripristino del Contesto: Durante il passaggio dalla modalità utente alla modalità kernel, e viceversa, il kernel salva e ripristina il contesto del processo corrente, compresi i registri, lo stack e altre informazioni importanti. Questo è necessario per garantire che l'esecuzione possa riprendere correttamente dopo una chiamata di sistema.
+
+
+- Interruzioni (Trappole): Quando un'applicazione utente richiede un servizio del kernel attraverso una chiamata di sistema, il controllo passa dalla modalità utente alla modalità kernel. Questo passaggio avviene attraverso una trappola o un'interruzione. L'applicazione utente emette un'istruzione di assembly che genera un'interruzione o una trappola specifica per una chiamata di sistema.
+- Interrupt Handler del Kernel: Una volta che l'interruzione o la trappola viene generata, il controllo passa all'interrupt handler del kernel. Questo handler è una porzione di codice del kernel che gestisce gli eventi generati dalle interruzioni e dalle trappole. Nel caso delle chiamate di sistema, l'interrupt handler riconosce il tipo di chiamata richiesta e la smista al gestore appropriato.
+- Gestione delle Chiamate di Sistema: Il kernel di OS/161 ha una tabella delle chiamate di sistema (system call table) che associa i numeri delle chiamate di sistema alle funzioni del kernel corrispondenti. Ad esempio, il numero 0 potrebbe essere associato a una chiamata di sistema per terminare un processo, il numero 1 per scrivere su un file, il numero 2 per leggere da un file, e così via.
+- Esecuzione delle Chiamate di Sistema: Una volta individuata la chiamata di sistema richiesta e associata alla sua funzione corrispondente, il kernel esegue il codice della funzione di chiamata di sistema. Questo può comportare la modifica dello stato del processo, l'allocazione di memoria, l'interazione con dispositivi di I/O e altro ancora.
+- Restituzione dei Risultati: Dopo l'esecuzione della chiamata di sistema, il controllo ritorna all'applicazione utente, e il risultato della chiamata di sistema (ad esempio, il valore restituito da una funzione di lettura/scrittura) può essere restituito all'applicazione.
+- Ripristino del Contesto: Durante il passaggio dalla modalità utente alla modalità kernel, e viceversa, il kernel salva e ripristina il contesto del processo corrente, compresi i registri, lo stack e altre informazioni importanti. Questo è necessario per garantire che l'esecuzione possa riprendere correttamente dopo una chiamata di sistema.
+
+
 In sostanza, OS/161 gestisce le chiamate di sistema attraverso il passaggio controllato tra le modalità utente e kernel, utilizzando interrupt handler specifici per instradare le chiamate al codice appropriato nel kernel.
 
-. Sono scritte in linguaggio assembly o in linguaggio C, a seconda dell'implementazione del sistema operativo e dell'architettura del processore. Le system call sono spesso implementate nel kernel del sistema operativo e consentono alle applicazioni utente di accedere a funzionalità del sistema che richiedono privilegi o che non sono direttamente accessibili dalla modalità utente.
+Sono scritte in linguaggio assembly o in linguaggio C, a seconda dell'implementazione del sistema operativo e dell'architettura del processore. Le system call sono spesso implementate nel kernel del sistema operativo e consentono alle applicazioni utente di accedere a funzionalità del sistema che richiedono privilegi o che non sono direttamente accessibili dalla modalità utente.
 Ecco alcuni esempi di system call comuni e importanti:
-fork(): Crea un nuovo processo identico (clonato) dal processo chiamante. Questa system call è fondamentale per la creazione di processi in sistemi a processo multipli.
-exec(): Sostituisce l'immagine del processo corrente con un nuovo programma specificato. Questa system call è utilizzata per avviare nuovi programmi all'interno di un processo.
-read() e write(): Consentono di leggere dati da un file o di scrivere dati in un file. Queste system call sono utilizzate per operazioni di I/O di base su file.
-open() e close(): Aprono e chiudono file. L'apertura di un file restituisce un descrittore di file che può essere utilizzato per altre operazioni di I/O.
-malloc() e free(): Queste system call sono usate per allocare e liberare la memoria dinamica. Sono fondamentali per la gestione della memoria nei programmi.
-exit(): Termina il processo corrente e restituisce un valore di uscita al padre. Questa system call è utilizzata per terminare un programma e restituire un risultato al chiamante.
-wait(): Sospende il processo chiamante fino a quando uno dei suoi processi figlio termina. Viene utilizzata per sincronizzare l'esecuzione dei processi.
-ioctl(): Fornisce un'interfaccia generica per controllare vari aspetti dei dispositivi di I/O, come terminale, stampante, ecc.
-chdir() e getcwd(): Cambiano la directory corrente o restituiscono il percorso della directory corrente.
-time(): Restituisce l'ora di sistema corrente.
+- **fork()**: Crea un nuovo processo identico (clonato) dal processo chiamante. Questa system call è fondamentale per la creazione di processi in sistemi a processo multipli.
+- **exec()**: Sostituisce l'immagine del processo corrente con un nuovo programma specificato. Questa system call è utilizzata per avviare nuovi programmi all'interno di un processo.
+- **read()** e **write()**: Consentono di leggere dati da un file o di scrivere dati in un file. Queste system call sono utilizzate per operazioni di I/O di base su file.
+- **open()** e **close()**: Aprono e chiudono file. L'apertura di un file restituisce un descrittore di file che può essere utilizzato per altre operazioni di I/O.
+- **malloc()** e **free()**: Queste system call sono usate per allocare e liberare la memoria dinamica. Sono fondamentali per la gestione della memoria nei programmi.
+- **exit()**: Termina il processo corrente e restituisce un valore di uscita al padre. Questa system call è utilizzata per terminare un programma e restituire un risultato al chiamante.
+- **wait()**: Sospende il processo chiamante fino a quando uno dei suoi processi figlio termina. Viene utilizzata per sincronizzare l'esecuzione dei processi.
+- **ioctl()**: Fornisce un'interfaccia generica per controllare vari aspetti dei dispositivi di I/O, come terminale, stampante, ecc.
+- **chdir()** e **getcwd()**: Cambiano la directory corrente o restituiscono il percorso della directory corrente.
+- **time()**: Restituisce l'ora di sistema corrente.
 
-Tabella delle Chiamate di Sistema: In NACHOS, la tabella delle chiamate di sistema è spesso definita nella classe syscall.h. Questa tabella associa i numeri delle chiamate di sistema alle funzioni del kernel corrispondenti.
-Esempio di definizione di una tabella delle chiamate di sistema in syscall.h:
+#### Tabella delle Chiamate di Sistema:
+ In NACHOS, la tabella delle chiamate di sistema è spesso definita nella classe syscall.h. Questa tabella associa i numeri delle chiamate di sistema alle funzioni del kernel corrispondenti.
+ Esempio di definizione di una tabella delle chiamate di sistema in syscall.h:
+```c
 // Definizione della tabella delle chiamate di sistema in NACHOS
 class NachosSyscall {
     public:
@@ -125,10 +137,11 @@ class NachosSyscall {
         void Read();
         // ... altre chiamate di sistema ...
 };
-
-Gestione delle Chiamate di Sistema: All'interno di NACHOS, il controllo delle chiamate di sistema avviene tramite la classe ExceptionHandler. Quando viene generata un'interruzione o una trappola, l'ExceptionHandler esamina il tipo di chiamata di sistema richiesta e inoltra l'esecuzione alla funzione corrispondente nella tabella delle chiamate di sistema.
-Esempio semplificato di gestione delle chiamate di sistema in ExceptionHandler:
-
+```
+#### Gestione delle Chiamate di Sistema:
+ All'interno di NACHOS, il controllo delle chiamate di sistema avviene tramite la classe ExceptionHandler. Quando viene generata un'interruzione o una trappola, l'ExceptionHandler esamina il tipo di chiamata di sistema richiesta e inoltra l'esecuzione alla funzione corrispondente nella tabella delle chiamate di sistema.
+ Esempio semplificato di gestione delle chiamate di sistema in ExceptionHandler:
+```c
 // Classe per la gestione delle chiamate di sistema in NACHOS
 class ExceptionHandler {
     public:
@@ -147,25 +160,26 @@ void ExceptionHandler::HandleException(ExceptionType which) {
         nachosSyscallTable->DoSyscall(type);
     }
 }
-
-Esecuzione delle Chiamate di Sistema: Ogni funzione nella classe NachosSyscall corrisponde a una chiamata di sistema specifica. L'implementazione di queste funzioni dipende dalla specifica azione richiesta dalla chiamata di sistema. Ad esempio, Halt() potrebbe arrestare il sistema, Exit(int status) potrebbe terminare un processo, e così via.
-Esempio di implementazione semplificata della funzione Halt():
-
+```
+#### Esecuzione delle Chiamate di Sistema:
+ Ogni funzione nella classe NachosSyscall corrisponde a una chiamata di sistema specifica. L'implementazione di queste funzioni dipende dalla specifica azione richiesta dalla chiamata di sistema. Ad esempio, Halt() potrebbe arrestare il sistema, Exit(int status) potrebbe terminare un processo, e così via.
+ Esempio di implementazione semplificata della funzione Halt():
+```c
 void NachosSyscall::Halt() {
     DEBUG('a', "Shutdown, initiated by user program.\n");
     interrupt->Halt();
 }
-
+```
 Restituzione dei Risultati: Alcune chiamate di sistema potrebbero restituire dei valori all'applicazione utente, ad esempio il risultato di una lettura da file. Questi valori vengono spesso restituiti attraverso registri specifici, come ad esempio il registro "2" (2 è un registro specifico del MIPS che spesso contiene il risultato delle chiamate di sistema).
 
 In sintesi, in NACHOS, le chiamate di sistema sono definite all'interno della classe NachosSyscall, la quale contiene funzioni che corrispondono a ciascuna chiamata di sistema. Quando viene generata un'interruzione o una trappola, l'ExceptionHandler determina il tipo di chiamata di sistema e inoltra l'esecuzione alla funzione corrispondente nella tabella delle chiamate di sistema. Le implementazioni delle chiamate di sistema possono variare a seconda delle azioni specifiche richieste. La classe NachosSyscall è una parte fondamentale di NACHOS ed è responsabile della gestione dell'interfaccia tra le applicazioni utente e il kernel del sistema operativo.
 
-Nachos è un sistema operativo didattico progettato per l'apprendimento dei principi dei sistemi operativi. Le system call (chiamate di sistema) in Nachos sono implementate attraverso l'interfaccia tra il codice dell'applicazione e il kernel del sistema operativo. Le chiamate di sistema permettono alle applicazioni utente di richiedere servizi dal kernel, come l'accesso ai file, la gestione dei processi, la comunicazione tra processi, e così via.
+Nachos è un sistema operativo didattico progettato per l'apprendimento dei principi dei sistemi operativi. Le **system call** (chiamate di sistema) in Nachos sono implementate attraverso l'interfaccia tra il codice dell'applicazione e il kernel del sistema operativo. Le chiamate di sistema permettono alle applicazioni utente di richiedere servizi dal kernel, come l'accesso ai file, la gestione dei processi, la comunicazione tra processi, e così via.
 
-Le system call in Nachos sono scritte usando una combinazione di linguaggio Assembly MIPS e C++. Di seguito ti fornirò alcuni esempi di chiamate di sistema importanti in Nachos:
+Le *system call* in Nachos sono scritte usando una combinazione di linguaggio Assembly MIPS e C++. Di seguito ti fornirò alcuni esempi di chiamate di sistema importanti in Nachos:
 
 1. **Halt**: Una chiamata di sistema che ferma il sistema operativo.
-
+```c
 // Interfaccia in C++
 void Halt();
 
@@ -178,7 +192,7 @@ Halt:
 ```
 
 2. **Exit**: Una chiamata di sistema per terminare un processo.
-
+```c
 // Interfaccia in C++
 void Exit(int status);
 
@@ -191,7 +205,7 @@ Exit:
 ```
 
 3. **Create**: Crea un nuovo file.
-
+```c
 // Interfaccia in C++
 OpenFileId Create(char *name);
 
@@ -204,7 +218,7 @@ Create:
 ```
 
 4. **Open**: Apre un file esistente.
-
+```c
 // Interfaccia in C++
 OpenFileId Open(char *name);
 
@@ -217,7 +231,7 @@ Open:
 ```
 
 5. **Read**: Legge dati da un file aperto.
-
+```c
 // Interfaccia in C++
 int Read(char *buffer, int size, OpenFileId id);
 
@@ -230,6 +244,7 @@ Read:
 ```
 
 6. **Write**: Scrive dati in un file aperto.
+```c
 // Interfaccia in C++
 void Write(char *buffer, int size, OpenFileId id);
 
