@@ -255,3 +255,122 @@ Write:
     syscall
     j $ra
 ```
+
+-----------------------------------------------------------
+-----------------------------------------------------------
+
+Andando ad approfondire la gestione delle system call in NachOS possiamo notare come vengono suddivise ed eseguite le varie parti di codice che ci garantiscono il funzionamento voluto.
+
+In particolar modo i file che andremo ad analizzare sono: machine.cc (con machine.h), exception.cc (con exception.h), start.c (simile a start.s) e syscall.h.
+
+In machine.h vanno definite le strutture dati per simulare l'esecuzione dei programmi utente eseguite sopra Nachos. 
+I programmi utente vengono caricati nella "mainMemory". All'interno della memoria è presente anche il kernel, ma viene caricato in una regione di memoria separata da quella dell'utente.
+I programmi e gli accessi alla memoria del kernel non vengono tradotti o paginati. I programmi utente vengono eseguiti un'istruzione alla volta, dal simulatore. Ogni riferimento alla memoria viene tradotto e controllato per la verifica degli errori.
+All'interno della classe machine viene definita l'hardware della workstation host simulata, come visto dai programmi utente: i registri della CPU, la memoria principale, ecc. I programmi utente non dovrebbero essere in grado di riconoscere che sono in esecuzione sul simulatore o sull'hardware reale.
+Per l'invocazione delle system call o se nel caso di eccezioni è necessario passare dalla modalità utente alla modalità kernel. Questo è reso possibile dal metodo Machine::RaiseException 
+
+```c
+//	"which" -- the cause of the kernel trap
+//	"badVaddr" -- the virtual address causing the trap, if appropriate
+void
+Machine::RaiseException(ExceptionType which, int badVAddr)
+{
+    DEBUG('m', "Exception: %s\n", exceptionNames[which]);
+    
+//  ASSERT(interrupt->getStatus() == UserMode);
+    registers[BadVAddrReg] = badVAddr;
+    DelayedLoad(0, 0);			// finish anything in progress
+    interrupt->setStatus(SystemMode);
+    ExceptionHandler(which);		// interrupts are enabled at this point
+    interrupt->setStatus(UserMode);
+}
+```
+
+Purchè questo sia possibile è necessaria una gestione a basso livello dei registri della CPU. Di seguito è riportata la definizione del set completo di registri MIPS e in aggiunta altri registri per poter avviare/arrestare un programma utente tra due istruzioni qualsiasi (tenendo traccia di load, delay solts, ecc.)
+
+```c
+#define StackReg	29	// User's stack pointer
+#define RetAddrReg	31	// Holds return address for procedure calls
+#define NumGPRegs	32	// 32 general purpose registers on MIPS
+#define HiReg		32	// Double register to hold multiply result
+#define LoReg		33
+#define PCReg		34	// Current program counter
+#define NextPCReg	35	// Next program counter (for branch delay) 
+#define PrevPCReg	36	// Previous program counter (for debugging)
+#define LoadReg		37	// The register target of a delayed load.
+#define LoadValueReg 	38	// The value to be loaded by a delayed load.
+#define BadVAddrReg	39	// The failing virtual address on an exception
+
+#define NumTotalRegs 	40
+```
+
+Il linguaggio assembly aiuta a effettuare chiamate di sistema al kernel Nachos. C'è uno stub per chiamata di sistema, che inserisce il codice per la chiamata di sistema nel registro r2, e lascia da soli gli argomenti della chiamata di sistema (in altre parole, arg1 è in r4, arg2 è in r5, arg3 è in r6, arg4 è in r7) Il valore restituito è in r2. Ciò segue la convenzione di chiamata C standard su MIPS.
+
+Di seguito parte del codice in assembly MIPS di start.s e definito in start.c per poter essere utilizzato nella modadlità utente. 
+
+```s
+       .text   
+       .align  2
+
+	.globl __start
+	.ent	__start
+__start:
+	jal	main
+	move	$4,$0		
+	jal	Exit	 /* if we return from main, exit(0) */
+	.end __start
+
+	.globl Halt
+	.ent	Halt
+Halt:
+	addiu $2,$0,SC_Halt
+	syscall
+	j	$31
+	.end Halt
+
+	.globl Exit
+	.ent	Exit
+Exit:
+	addiu $2,$0,SC_Exit
+	syscall
+	j	$31
+	.end Exit
+
+	.globl Exec
+	.ent	Exec
+Exec:
+	addiu $2,$0,SC_Exec
+	syscall
+	j	$31
+	.end Exec
+
+	.globl Join
+	.ent	Join
+Join:
+	addiu $2,$0,SC_Join
+	syscall
+	j	$31
+	.end Join
+
+	.globl CreateFile
+	.ent	CreateFile
+```
+
+Una volta gestito il contenuto dei registri e chiamando la Machine::RaiseException, si passa alla gestione delle eccezioni.
+
+Questa viene effettuata in exception.cc dove, tramite l'utilizzo di uno switch case, vengo gestite le varie eccezioni che possono essere generate e come ultimo caso la gestione delle syscall exception. All'interno di questo ramo dello switch si possono andare a gestite tutte le possibili chiamate di sistema che possono essere effettuate. Come parametro per la selezione del tipo di chiamata si utilizzano i valori definiti dalla tabella delle system call (syscall.h).
+
+```c
+//Define System call
+
+#define SC_Halt			0
+#define SC_Exit			1
+#define SC_Exec			2
+#define SC_Join			3
+#define SC_CreateFile   4
+#define SC_Open			5
+#define SC_Read			6
+#define SC_Write		7
+#define SC_Close		8
+
+```
