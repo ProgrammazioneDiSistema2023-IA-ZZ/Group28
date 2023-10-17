@@ -256,8 +256,205 @@ Write:
     j $ra
 ```
 
------------------------------------------------------------
------------------------------------------------------------
+---
+---
+
+##### Nachos
+Le **system call** (chiamate di sistema) in Nachos sono implementate attraverso l'interfaccia tra il codice dell'applicazione e il kernel del sistema operativo.
+Analizzando il codice di Nachos possiamo notare come le chiamate di sistema vengono gestite e implementate.
+
+In particolar modo poniamo la nostra attenzione su tutto il processo di gestione delle chiamate di sistema partendo da machine.cc (con machine.h) e continuando con exception.cc (con exception.h), start.s (con start.c) e syscall.h.
+
+In *machine.h* vanno definite le strutture dati per simulare l'esecuzione dei programmi utente eseguite sopra Nachos. 
+I programmi utente vengono caricati nella "mainMemory". All'interno della memoria è presente anche il kernel, ma viene caricato in una regione di memoria separata da quella dell'utente.
+I programmi e gli accessi alla memoria del kernel non vengono tradotti o paginati. I programmi utente vengono eseguiti un'istruzione alla volta, dal simulatore. Ogni riferimento alla memoria viene tradotto e controllato per la verifica degli errori. 
+All'interno della classe machine viene definita l'hardware della workstation host simulata, come visto dai programmi utente: i registri della CPU, la memoria principale, ecc.
+In particolare si può notare la presenza del metodo ```c void IncreasePC() ``` che va a simulare l'hw andando ad incrementare di 4 il valore del program counter (PC) per poter eseguire la prossima istruzione.
+I programmi utente non dovrebbero essere in grado di riconoscere che sono in esecuzione sul simulatore o sull'hardware reale.
+Per l'invocazione delle system call o nel caso di eccezioni è necessario passare dalla modalità utente alla modalità kernel. Questo è reso possibile dal metodo Machine::RaiseException, di seguito l'implementazione presente in *machine.cc*.
+
+```c
+//	"which" -- the cause of the kernel trap
+//	"badVaddr" -- the virtual address causing the trap, if appropriate
+void
+Machine::RaiseException(ExceptionType which, int badVAddr)
+{
+    DEBUG('m', "Exception: %s\n", exceptionNames[which]);
+    
+//  ASSERT(interrupt->getStatus() == UserMode);
+    registers[BadVAddrReg] = badVAddr;
+    DelayedLoad(0, 0);			// finish anything in progress
+    interrupt->setStatus(SystemMode);
+    ExceptionHandler(which);		// interrupts are enabled at this point
+    interrupt->setStatus(UserMode);
+}
+```
+Purchè questo sia possibile è necessaria una gestione a basso livello dei registri della CPU. Di seguito è riportata la definizione del set completo di registri MIPS e in aggiunta altri registri per poter avviare/arrestare un programma utente tra due istruzioni qualsiasi (tenendo traccia di load, delay solts, ecc.).
+
+```c
+#define StackReg	29	// User's stack pointer
+#define RetAddrReg	31	// Holds return address for procedure calls
+#define NumGPRegs	32	// 32 general purpose registers on MIPS
+#define HiReg		32	// Double register to hold multiply result
+#define LoReg		33
+#define PCReg		34	// Current program counter
+#define NextPCReg	35	// Next program counter (for branch delay) 
+#define PrevPCReg	36	// Previous program counter (for debugging)
+#define LoadReg		37	// The register target of a delayed load.
+#define LoadValueReg 	38	// The value to be loaded by a delayed load.
+#define BadVAddrReg	39	// The failing virtual address on an exception
+
+#define NumTotalRegs 	40
+```
+Nel contesto del sistema operativo NachOs e della sua architettura basata su MIPS, l'utilizzo dell'assembly per alcune parti delle system call è cruciale per ragioni di prestazioni e accesso diretto all'hardware. L'assembly è in grado di gestire in modo più efficiente operazioni a basso livello, come la gestione dei registri e l'accesso ai registri di memoria.
+
+Prima dell'effettiva esecuzione delle system call è necessaria una gestione dei registri affinchè vi siano presenti all'interno tutte le informazioni per fare eseguire correttamente il codice. É presente uno stub per chiamata di sistema, che inserisce il codice della system call da eseguire nel registro r2, e mantiene i valori degli argomenti (in altre parole, arg1 è in r4, arg2 è in r5, arg3 è in r6, arg4 è in r7). Il valore restituito è in r2. Ciò segue la convenzione di chiamata C standard su MIPS.
+
+Di seguito parte del codice in assembly MIPS di *start.s* e definito in *start.c* per poter essere utilizzato nella modadlità utente. 
+
+```s
+       .text   
+       .align  2
+
+	.globl __start
+	.ent	__start
+__start:
+	jal	main
+	move	$4,$0		
+	jal	Exit	 /* if we return from main, exit(0) */
+	.end __start
+
+	.globl Halt
+	.ent	Halt
+Halt:
+	addiu $2,$0,SC_Halt
+	syscall
+	j	$31
+	.end Halt
+
+	.globl Exit
+	.ent	Exit
+Exit:
+	addiu $2,$0,SC_Exit
+	syscall
+	j	$31
+	.end Exit
+
+	.globl Exec
+	.ent	Exec
+Exec:
+	addiu $2,$0,SC_Exec
+	syscall
+	j	$31
+	.end Exec
+
+	.globl Join
+	.ent	Join
+Join:
+	addiu $2,$0,SC_Join
+	syscall
+	j	$31
+	.end Join
+
+	.globl CreateFile
+	.ent	CreateFile
+```
+Una volta gestito il contenuto dei registri e chiamando la Machine::RaiseException, si passa alla gestione delle eccezioni.
+
+Il file *exception.cc* rappresenta l'entry point nel kernel di NachOS per i programmi utente. Qui, le eccezioni, gli interrupt e le system call vengono gestite nel loro complesso. Questo file contiene la gestione delle eccezioni, l'aggiornamento del program counter (PC) e le funzioni per il passaggio da modalità kernel a modalità utente e viceversa.
+
+La gestione di eccezioni, interrupt e system call viene effettuata tramite l'utilizzo di uno switch case. Come parametro per la selezione del tipo di chiamata si utilizzano i valori definiti dalla tabella delle system call (syscall.h) che va ad associare un numero identificativo univoco (SYSCALL-ID) a ciascuna system call.
+
+```c
+//Define System call
+
+#define SC_Halt			0
+#define SC_Exit			1
+#define SC_Exec			2
+#define SC_Join			3
+#define SC_CreateFile   4
+#define SC_Open			5
+#define SC_Read			6
+#define SC_Write		7
+#define SC_Close		8
+
+```
+
+Un'implementazione dello switch case è la seguente:
+    
+```c
+void ExceptionHandler(ExceptionType which)
+{
+    int type = machine->ReadRegister(2);
+
+	
+	switch (which) {
+	case NoException:
+		return;
+
+	case PageFaultException:
+		DEBUG('a', "\n No valid translation found");
+		printf("\n\n No valid translation found");
+		interrupt->Halt();
+		break;
+
+	case ReadOnlyException:
+		DEBUG('a', "\n Write attempted to page marked read-only");
+		printf("\n\n Write attempted to page marked read-only");
+		interrupt->Halt();
+		break;
+
+	case BusErrorException:
+		DEBUG('a', "\n Translation resulted invalid physical address");
+		printf("\n\n Translation resulted invalid physical address");
+		interrupt->Halt();
+		break;
+
+	case AddressErrorException:
+		DEBUG('a', "\n Unaligned reference or one that was beyond the end of the address space");
+		printf("\n\n Unaligned reference or one that was beyond the end of the address space");
+		interrupt->Halt();
+		break;
+
+	case OverflowException:
+		DEBUG('a', "\nInteger overflow in add or sub.");
+		printf("\n\n Integer overflow in add or sub.");
+		interrupt->Halt();
+		break;
+
+	case IllegalInstrException:
+		DEBUG('a', "\n Unimplemented or reserved instr.");
+		printf("\n\n Unimplemented or reserved instr.");
+		interrupt->Halt();
+		break;
+
+	case NumExceptionTypes:
+		DEBUG('a', "\n Number exception types");
+		printf("\n\n Number exception types");
+		interrupt->Halt();
+		break;
+
+	case SyscallException:
+		switch (type){
+
+		case SC_Halt:
+			DEBUG('a', "\nShutdown, initiated by user program. ");
+			printf("\nShutdown, initiated by user program. ");
+			interrupt->Halt();
+			return;
+
+        default:
+			break;
+		}
+		IncreasePC();
+	}
+}
+ ```
+
+
+---
+
+PARTE VECCHIA
 
 Andando ad approfondire la gestione delle system call in NachOS possiamo notare come vengono suddivise ed eseguite le varie parti di codice che ci garantiscono il funzionamento voluto.
 
@@ -267,7 +464,7 @@ In machine.h vanno definite le strutture dati per simulare l'esecuzione dei prog
 I programmi utente vengono caricati nella "mainMemory". All'interno della memoria è presente anche il kernel, ma viene caricato in una regione di memoria separata da quella dell'utente.
 I programmi e gli accessi alla memoria del kernel non vengono tradotti o paginati. I programmi utente vengono eseguiti un'istruzione alla volta, dal simulatore. Ogni riferimento alla memoria viene tradotto e controllato per la verifica degli errori.
 All'interno della classe machine viene definita l'hardware della workstation host simulata, come visto dai programmi utente: i registri della CPU, la memoria principale, ecc. I programmi utente non dovrebbero essere in grado di riconoscere che sono in esecuzione sul simulatore o sull'hardware reale.
-Per l'invocazione delle system call o se nel caso di eccezioni è necessario passare dalla modalità utente alla modalità kernel. Questo è reso possibile dal metodo Machine::RaiseException 
+Per l'invocazione delle system call o nel caso di eccezioni è necessario passare dalla modalità utente alla modalità kernel. Questo è reso possibile dal metodo Machine::RaiseException 
 
 ```c
 //	"which" -- the cause of the kernel trap
@@ -358,7 +555,9 @@ Join:
 
 Una volta gestito il contenuto dei registri e chiamando la Machine::RaiseException, si passa alla gestione delle eccezioni.
 
-Questa viene effettuata in exception.cc dove, tramite l'utilizzo di uno switch case, vengo gestite le varie eccezioni che possono essere generate e come ultimo caso la gestione delle syscall exception. All'interno di questo ramo dello switch si possono andare a gestite tutte le possibili chiamate di sistema che possono essere effettuate. Come parametro per la selezione del tipo di chiamata si utilizzano i valori definiti dalla tabella delle system call (syscall.h).
+Il file *exception.cc* rappresenta l'entry point nel kernel di NachOS per i programmi utente. Qui, le eccezioni, gli interrupt e le system call vengono gestite nel loro complesso. Questo file contiene la gestione delle eccezioni, l'aggiornamento del program counter (PC) e le funzioni per il passaggio da modalità kernel a modalità utente e viceversa.
+
+La gestione di eccezioni, interrupt e system call viene effettuata tramite l'utilizzo di uno switch case. Come parametro per la selezione del tipo di chiamata si utilizzano i valori definiti dalla tabella delle system call (syscall.h) che va ad associare un numero identificativo univoco (SYSCALL-ID) a ciascuna system call.
 
 ```c
 //Define System call
@@ -374,3 +573,74 @@ Questa viene effettuata in exception.cc dove, tramite l'utilizzo di uno switch c
 #define SC_Close		8
 
 ```
+
+Un'implementazione dello switch case è la seguente:
+    
+```c
+void ExceptionHandler(ExceptionType which)
+{
+    int type = machine->ReadRegister(2);
+
+	
+	switch (which) {
+	case NoException:
+		return;
+
+	case PageFaultException:
+		DEBUG('a', "\n No valid translation found");
+		printf("\n\n No valid translation found");
+		interrupt->Halt();
+		break;
+
+	case ReadOnlyException:
+		DEBUG('a', "\n Write attempted to page marked read-only");
+		printf("\n\n Write attempted to page marked read-only");
+		interrupt->Halt();
+		break;
+
+	case BusErrorException:
+		DEBUG('a', "\n Translation resulted invalid physical address");
+		printf("\n\n Translation resulted invalid physical address");
+		interrupt->Halt();
+		break;
+
+	case AddressErrorException:
+		DEBUG('a', "\n Unaligned reference or one that was beyond the end of the address space");
+		printf("\n\n Unaligned reference or one that was beyond the end of the address space");
+		interrupt->Halt();
+		break;
+
+	case OverflowException:
+		DEBUG('a', "\nInteger overflow in add or sub.");
+		printf("\n\n Integer overflow in add or sub.");
+		interrupt->Halt();
+		break;
+
+	case IllegalInstrException:
+		DEBUG('a', "\n Unimplemented or reserved instr.");
+		printf("\n\n Unimplemented or reserved instr.");
+		interrupt->Halt();
+		break;
+
+	case NumExceptionTypes:
+		DEBUG('a', "\n Number exception types");
+		printf("\n\n Number exception types");
+		interrupt->Halt();
+		break;
+
+	case SyscallException:
+		switch (type){
+
+		case SC_Halt:
+			DEBUG('a', "\nShutdown, initiated by user program. ");
+			printf("\nShutdown, initiated by user program. ");
+			interrupt->Halt();
+			return;
+
+        default:
+			break;
+		}
+		IncreasePC();
+	}
+}
+ ```
