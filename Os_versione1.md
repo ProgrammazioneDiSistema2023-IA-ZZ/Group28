@@ -26,14 +26,21 @@ Questa politica favorisce inoltre la portabilià verso altre architetture di que
 infrastruttura didattica. Il codice sorgente di kernel e simulatore sono linkati
 assieme per costruire l’eseguibile finale.
 
-![Alt text](Immagini/image.png)
 ![Alt text](Immagini/image-2.png)
+
+Nachos è strutturato in categorie di funzionalità:
+- Il kernel contiene le caratteristiche vitali di Nachos: processi leggeri (thread), sincronizzazione
+tra thread, programmazione, spazi di indirizzo;
+- I driver di dispositivo forniscono l'interfaccia per accedere ai dispositivi hardware (simulati)
+(disco, console) ,
+- Gestione della memoria virtuale (dettagliata in seguito);
+- Gestione dei file
 
 La combinazione dell'hardware simulato, del kernel Nachos e i programmi utente Nachos vengono complessivamente eseguiti in un unico processo Unix, come illustrato nelle immagini. 
 Questo approccio ha un duplice vantaggio:
 
 1)  Lo sviluppo del kernel è semplificato perché l'hardware simulato, sebbene abbastanza realistico, è volutamente molto semplice.
-2) Il debug del codice del kernel Nachos è facilitato, perché un errore nel file il codice non blocca la macchina e gli strumenti di debug standard (ad esempio gdb) può essere utilizzata.
+2) Il debug del codice del kernel Nachos è facilitato, perché un errore nel file non blocca la macchina e gli strumenti di debug standard (ad esempio gdb) possono essere utilizzati.
 
 Il kernel di Nachos, in caso di attività di I/O, si interfaccia con il
 simulatore macchina attraverso opportune funzioni; il simulatore provvede
@@ -58,12 +65,18 @@ threads
 - Nachos/code/userprog – sorgente relativo alle funzionalità per il
 caricamento ed esecuzione delle applicazioni utente
 
+__ Modificare a seconda della versione originale di Nachos
+
+__Modificare grammatica e punteggiatura
 
 ## Analisi
 ### 1. Kernel
 **Cos'è il Kernel?** Il _Kernel_ rappresenta il nucleo fondamentale di un sistema operativo. È responsabile della gestione delle risorse hardware e della fornitura di servizi essenziali a livello basso per i processi utente. I processi utente sono i programmi in esecuzione sul sistema, che operano nella cosiddetta modalità utente. Questa modalità impone restrizioni di accesso alle risorse hardware e al codice del kernel al fine di garantire isolamento e sicurezza.
 
-Funzioni Principali
+
+    Il _Kernel_  fornisce i servizi a basso livello ai processi utente. Quest'ultimi sono i programmi in esecuzione sul sistema che operano in modalità utente ( una modalità con restrizioni di accesso alle risorse hw e al codice kernel, per garantire isolmento e sicurezza).Quindi mette a disposizione le **System Call**, per consentire ai processi utente di eseguire operazioni di cui, altrimenti, non avrebbero i privilegi. Queste operazioni sono varie ed includono: accesso a dispositivi, gestione file, creazione processi, gestione memoria e altro ancora. 
+
+**Funzioni Principali**
 Il Kernel svolge diverse funzioni cruciali per il funzionamento del sistema operativo:
 
 Gestione delle Risorse: Il Kernel alloca e gestisce le risorse hardware, come memoria, processori, dispositivi di I/O e spazio su disco. Coordinando l'accesso a queste risorse, il Kernel evita conflitti e ottimizza l'utilizzo delle stesse.
@@ -77,11 +90,19 @@ Gestione della Memoria: Controlla la gestione della memoria fisica e virtuale de
 Gestione degli Interruttori: Il Kernel gestisce gli interrupt, che sono segnali generati da hardware o eventi esterni che richiedono l'attenzione immediata del sistema. Questi possono includere segnali di dispositivo di I/O completato o errori hardware.
 
 #### Nachos
-Il **kernel** di Nachos gestisce un insieme di processi leggeri (thread) che vengono eseguiti sul file Processore MIPS (simulato) e vengono eseguiti contemporaneamente e condividono lo stesso _process address space_. Chiamiamo processo la combinazione di uno spazio di indirizzi e del set
+Il **kernel** di Nachos gestisce un insieme di processi leggeri (thread) che vengono eseguiti contemporaneamente sul file Processore MIPS (simulato) e condividono lo stesso _process address space_. 
+
+
+-----
+Chiamiamo processo la combinazione di uno spazio di indirizzi e del set
 di thread che lo condividono. Ogni processo è parallelo agli altri.
 La politica di pianificazione implementata è puramente FIFO (First In, First Out) senza alcun concetto di
 priorità del thread e nessuna condivisione del tempo. Gli strumenti di sincronizzazione forniti contano i semafori,
 variabili di condizione e blocchi di mutua esclusione.
+
+-----
+
+
 
 NachOS è progettato per essere un sistema **monolitico semplificato**, il che significa che tutto il kernel opera nello stesso spazio di indirizzi e condivide risorse direttamente. Questo rende la gestione delle system call relativamente più semplice, ma potrebbe portare a problemi di sicurezza e stabilità in un ambiente di produzione
 
@@ -107,9 +128,8 @@ La _memoria_ nel kernel di 0s161 è solitamente suddivisa in tre parti principal
 ### 2. System Call
 
 **Cosa sono le System Call?**
-Le System Call o 'chiamate di sistema' sono un meccaniscmo fondamentale nei sistemi operativi che consentono ai _proessi utenti_ di interagire con il _Kernel_ cosentendo ai programmi utente di richiedere servizi e risorse offerti dal sistema operativo.
+Le System Call o 'chiamate di sistema' sono un meccaniscmo fondamentale nei sistemi operativi che consentono ai _proessi utenti_ di interagire con il _Kernel_ e di richiedere servizi e risorse offerti dal sistema operativo.
 
-    Il _Kernel_  fornisce i servizi a basso livello ai processi utente. Quest'ultimi sono i programmi in esecuzione sul sistema che operano in modalità utente ( una modalità con restrizioni di accesso alle risorse hw e al codice kernel, per garantire isolmento e sicurezza).Quindi mette a disposizione le **System Call**, per consentire ai processi utente di eseguire operazioni di cui, altrimenti, non avrebbero i privilegi. Queste operazioni sono varie ed includono: accesso a dispositivi, gestione file, creazione processi, gestione memoria e altro ancora. 
 Le System Call offrono un'interfaccia standardizzata per accedere ai servizi del Kernel. Ciò semplifica l'uso di funzioni apparentemente semplici come read() e write(), che si traducono in istruzioni Assembly e, quindi, in System Call.
 
 ---
@@ -119,7 +139,7 @@ Questo passaggio da livello utente a livello kernel è molto delicato, poichè  
 
 ---
 
- Di seguito, confronto come funzionano le system call in OS/161 e NACHOS:
+
 #### Os161:
 - **Gestione delle System Call**: In OS/161, le system call vengono gestite in modalità kernel. Quando un'applicazione utente esegue una system call, il controllo passa al kernel.
 - **Switch di Modalità**: Quando avviene una system call, OS/161 passa dalla modalità utente alla modalità kernel, nota anche come "modalità privilegiata". Questo è reso possibile grazie alle istruzioni specifiche delle architetture dei processori moderni.
@@ -159,10 +179,8 @@ syscall_function_t syscall_table[SYSCALL_COUNT];
 - **Restituzione dei Risultati**: Dopo l'esecuzione della chiamata di sistema, il controllo ritorna all'applicazione utente, e il risultato della chiamata di sistema (ad esempio, il valore restituito da una funzione di lettura/scrittura) può essere restituito all'applicazione.
 - **Ripristino del Contesto**: Durante il passaggio dalla modalità utente alla modalità kernel, e viceversa, il kernel salva e ripristina il contesto del processo corrente, compresi i registri, lo stack e altre informazioni importanti. Questo è necessario per garantire che l'esecuzione possa riprendere correttamente dopo una chiamata di sistema.
 
-In sostanza, OS/161 gestisce le chiamate di sistema attraverso il passaggio controllato tra le modalità utente e kernel, utilizzando interrupt handler specifici per instradare le chiamate al codice appropriato nel kernel.
-
 Ogni numero di chiamata di sistema è associato a una funzione specifica nel kernel. Ecco un esempio semplificato di come potrebbe apparire la definizione e l'inizializzazione della tabella delle chiamate di sistema in OS/161:
-##### Os161
+
 ```c
 // Definizione delle chiamate di sistema in OS/161
 #define SYS_HALT 0
@@ -180,18 +198,7 @@ int sys_read(int filehandle, char *buf, size_t size) {
     // Implementazione della lettura dal filehandle nel buffer
     // Restituzione del numero di byte letti o di un valore di errore }
 ```
-Le _system call_ sono scritte in linguaggio assembly o in linguaggio C, a seconda dell'implementazione del sistema operativo e dell'architettura del processore. 
-Ecco alcuni esempi di system call comuni e importanti:
-- **fork()**: Crea un nuovo processo identico (clonato) dal processo chiamante. Questa system call è fondamentale per la creazione di processi in sistemi a processo multipli.
-- **exec()**: Sostituisce l'immagine del processo corrente con un nuovo programma specificato. Questa system call è utilizzata per avviare nuovi programmi all'interno di un processo.
-- **read()** e **write()**: Consentono di leggere dati da un file o di scrivere dati in un file. Queste system call sono utilizzate per operazioni di I/O di base su file.
-- **open()** e **close()**: Aprono e chiudono file. L'apertura di un file restituisce un descrittore di file che può essere utilizzato per altre operazioni di I/O.
-- **malloc()** e **free()**: Queste system call sono usate per allocare e liberare la memoria dinamica. Sono fondamentali per la gestione della memoria nei programmi.
-- **exit()**: Termina il processo corrente e restituisce un valore di uscita al padre. Questa system call è utilizzata per terminare un programma e restituire un risultato al chiamante.
-- **wait()**: Sospende il processo chiamante fino a quando uno dei suoi processi figlio termina. Viene utilizzata per sincronizzare l'esecuzione dei processi.
-- **ioctl()**: Fornisce un'interfaccia generica per controllare vari aspetti dei dispositivi di I/O, come terminale, stampante, ecc.
-- **chdir()** e **getcwd()**: Cambiano la directory corrente o restituiscono il percorso della directory corrente.
-- **time()**: Restituisce l'ora di sistema corrente.
+
 
 ##### Nachos
 Le **system call** (chiamate di sistema) in Nachos sono implementate attraverso l'interfaccia tra il codice dell'applicazione e il kernel del sistema operativo. 
@@ -202,14 +209,14 @@ Ogni funzione nella classe NachosSyscall corrisponde a una chiamata di sistema s
 
 1) Nel file _"syscall.h"_ vengono definite le interfacce delle funzioni associate alle system call. Queste definizioni forniscono una modalità standard per invocare le system call da parte dei programmi utente. Inoltre, vi è una definizione sommaria(può essere arricchita con altre system call, qualora venga ritenuto necessario), di una forma di SYSTEM CALL TABLE. La system call table è una struttura dati che associa un numero identificativo univoco (SYSCALL-ID) a ciascuna system call. Questo è ciò che consente al kernel di individuare la corrispondente funzione da eseguire quando una system call viene invocata.
  
- ![Alt text](Immagini/image-1.png)
+ ![Alt text](Immagini/systemcall_codes.png)
                 -
 
 2) Il file _‘code/userprogr/exception.cc’_ è l'entry point nel kernel di NachOs per i programmi utente. Qui, le eccezioni, gli interrupt e le system call vengono gestite nel loro complesso. Questo file contiene la gestione delle eccezioni, l'aggiornamento del program counter (PC) e le funzioni per il passaggio da modalità kernel a modalità utente e viceversa.
 
 ---
-Il program counter (PC) è un registro speciale che contiene l'indirizzo della prossima istruzione da eseguire. Nel contesto delle system call e delle eccezioni, l'incremento del PC è essenziale per il corretto avanzamento dell'esecuzione. Dopo l'esecuzione di ogni istruzione, il PC viene automaticamente incrementato di un valore corrispondente alla dimensione dell'istruzione (spesso 4 byte in architetture come MIPS).
-Tuttavia, in situazioni in cui il flusso di esecuzione deve essere modificato manualmente, come quando si passa da modalità utente a modalità kernel o viceversa, il PC può essere manipolato per controllare quali istruzioni vengono eseguite successivamente. Ad esempio, quando viene eseguita una system call, il PC potrebbe essere regolato per passare all'indirizzo della routine di gestione della system call nel kernel.
+Il program counter (PC) è un registro speciale che contiene l'indirizzo della prossima istruzione da eseguire. ----Nel contesto delle system call e delle eccezioni, l'incremento del PC è essenziale per il corretto avanzamento dell'esecuzione.---- Dopo l'esecuzione di ogni istruzione, il PC viene automaticamente incrementato di un valore corrispondente alla dimensione dell'istruzione (spesso 4 byte in architetture come MIPS).
+----Tuttavia, in situazioni in cui il flusso di esecuzione deve essere modificato manualmente, come quando si passa da modalità utente a modalità kernel o viceversa,---- il PC può essere manipolato per controllare quali istruzioni vengono eseguite successivamente. Ad esempio, quando viene eseguita una system call, il PC potrebbe essere regolato per passare all'indirizzo della routine di gestione della system call nel kernel.
 
 ``` C
 void IncreasePC()
@@ -427,4 +434,35 @@ Di seguito alcuni esempi di chiamate di sistema importanti in Nachos:
     Descrizione: Crea un nuovo processo identico al processo chiamante. 
     Utilizzo: Fork();
     Finalità: Crea un nuovo processo che è una copia esatta del processo chiamante, incluso lo stato corrente.
+
+### 3. Algoritmi di scheduling
+#### NachOS
+
+La politica di pianificazione implementata è pura **FIFO** (First In, First Out) senza concetto di
+priorità del thread e nessuna condivisione del tempo. Se gli strumenti di sincronizzazione sono conteggio semafori,
+variabili di condizione e serrature reciproche di esclusione.
+
+
+
+La **classe Scheduler (scheduler.cc, scheduler.h)** è incaricata di implementare la pianificazione dei thread. C'è una singola istanza
+di questa classe, creata all'avvio. Lo scheduler gestisce un elenco di thread che sono pronti a
+eseguire (variabile readyList), e implementa il passaggio di contesto tra i thread. L'attivo
+thread, per costruzione, non fa parte della lista pronta, che contiene solo pronto ma non attivo
+thread. Un puntatore al thread attivo è memorizzato in g variabile thread corrente.
+- void ReadyToRun(Thread *thread): inserts a thread at the end of the ready list
+(this function assumes that interrupts are masked);
+- Thread *FindNextToRun(void): returns a pointer to the first thread of the ready
+list and removes it from the list;
+- void SwitchTo(Thread *nextThread): allocates the processor to thread nextThread
+(usually the result of a call to FindNextToRun).
+
+Il Passaggio di contesto tra due thread (dallo stesso o differente) viene eseguita
+in metodo **SwitchTo()** di classe Scheduler. Lo scopo di questo metodo è quello di salvare il contesto di
+il thread attivo e impostare quello per il thread successivo da eseguire.
+Nel contesto di Nachos, i programmi utente eseguono
+su un processore MIPS emulato, mentre il kernel Nachos esegue direttamente sull'host
+macchina. Di conseguenza, due contesti devono essere gestiti durante un context switch: il
+user context (MIPS) e il contesto del kernel. 
+
+#### Os161
 
