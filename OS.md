@@ -267,7 +267,7 @@ In particolar modo poniamo la nostra attenzione su tutto il processo di gestione
 
 In *machine.h* vanno definite le strutture dati per simulare l'esecuzione dei programmi utente eseguite sopra Nachos. 
 I programmi utente vengono caricati nella "mainMemory". All'interno della memoria è presente anche il kernel, ma viene caricato in una regione di memoria separata da quella dell'utente.
-I programmi e gli accessi alla memoria del kernel non vengono tradotti o paginati. I programmi utente vengono eseguiti un'istruzione alla volta, dal simulatore. Ogni riferimento alla memoria viene tradotto e controllato per la verifica degli errori. 
+I programmi e gli accessi alla memoria del kernel non vengono tradotti o paginati di default. I programmi utente vengono eseguiti un'istruzione alla volta, dal simulatore. Ogni riferimento alla memoria viene tradotto e controllato per la verifica degli errori. 
 All'interno della classe machine viene definita l'hardware della workstation host simulata, come visto dai programmi utente: i registri della CPU, la memoria principale, ecc.
 In particolare si può notare la presenza del metodo ```c void IncreasePC() ``` che va a simulare l'hw andando ad incrementare di 4 il valore del program counter (PC) per poter eseguire la prossima istruzione.
 I programmi utente non dovrebbero essere in grado di riconoscere che sono in esecuzione sul simulatore o sull'hardware reale.
