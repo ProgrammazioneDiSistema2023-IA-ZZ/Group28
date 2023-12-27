@@ -1,9 +1,5 @@
 # Analisi comparativa tra Os161 e Xv6
 
-#### Sources:
-https://clownote.github.io/2021/02/27/xv6/Xv6-operating-system-organization/
-https://pdos.csail.mit.edu/6.828/2018/xv6/book-rev11.pdf
-
 ## Introduzione
 
 Questo studio si concentra principalmente sull'analisi del sistema operativo Xv6, confrontandolo con Os161. L'obiettivo di questa analisi comparativa è offrire una panoramica delle capacità di Os161 e Xv6, mettendo in evidenza le differenze e le somiglianze tra questi due sistemi operativi open source.
@@ -20,8 +16,12 @@ Le funzioni chiave oggetto di studio includono system calls, meccanismi di sincr
 Il sistema operativo è organizzato in modo che risieda tutto all'interno del kernel in modo che le implementazioni di tutte le chiamate di sistema vengano eseguite in modalità kernel. Questa organizzazione è chiamata kernel monolitico.
 
 <div align="center">
-    <img src="Immagini\xv6\monolithic.jpg" width="291" height="189">
+    <figure>
+     <img src="Immagini\xv6\monolithic.jpg" width="291" height="189">
+         <figcaption>Figura 1: Kernel monolitico</figcaption>
+   </figure> 
 </div>
+
 In questa organizzazione, l'intero sistema operativo viene eseguito con pieno privilegio hardware. Questa organizzazione è conveniente perché il progettista del sistema operativo non deve decidere quale parte del sistema operativo non ha bisogno di pieno privilegio hardware. Inoltre, è facile per diverse parti del sistema operativo cooperare. Ad esempio, un sistema operativo potrebbe avere una cache di buffer che può essere condivisa sia dal sistema di file che dal sistema di memoria virtuale.
 
 Un inconveniente dell'organizzazione monolitica è che le interfacce tra le diverse parti del sistema operativo sono spesso complesse, ed è quindi facile per uno sviluppatore del sistema operativo commettere un errore. In un kernel monolitico, un errore è fatale, perché un errore in modalità kernel spesso comporta il fallimento del kernel. Se il kernel fallisce, il computer smette di funzionare e, di conseguenza, tutte le applicazioni falliscono. Il computer deve essere riavviato per ripartire.
@@ -29,7 +29,10 @@ Un inconveniente dell'organizzazione monolitica è che le interfacce tra le dive
 Per ridurre il rischio di errori nel kernel, i progettisti del sistema operativo possono minimizzare la quantità di codice del sistema operativo che viene eseguita in modalità kernel ed eseguire la maggior parte del sistema operativo in modalità utente. Questa organizzazione del kernel è chiamata microkernel. 
 
 <div align="center">
-    <img src="Immagini\xv6\microkernel.jpg" width="340" height="134">
+    <figure>
+     <img src="Immagini\xv6\microkernel.jpg" width="340" height="134">
+        <figcaption>Figura 2: Microkernel</figcaption>
+   </figure> 
 </div>
 
 Nella figura, il sistema di file viene eseguito come processo a livello utente. I servizi del sistema operativo eseguiti come processi sono chiamati server. Per consentire alle applicazioni di interagire con il file server, il kernel fornisce un meccanismo di comunicazione tra processi per inviare messaggi da un processo a livello utente a un altro.
@@ -48,10 +51,26 @@ Ogni spazio degli indirizzi di un processo mappa le istruzioni e i dati del kern
 Quando un processo effettua una chiamata di sistema, il processore passa allo stack del kernel, aumenta il livello di privilegio hardware e inizia a eseguire le istruzioni del kernel che implementano la chiamata di sistema. Quando la chiamata di sistema si completa, il kernel torna allo spazio utente: l'hardware abbassa il livello di privilegio, passa di nuovo allo stack utente e riprende l'esecuzione delle istruzioni utente subito dopo l'istruzione di chiamata di sistema.
 
 <div align="center">
-    <img src="Immagini\xv6\layout_virtual_address_space.jpg" width="426" height="212">
+    <figure>
+     <img src="Immagini\xv6\layout_virtual_address_space.jpg" width="426" height="212">
+        <figcaption>Figura 3: Layout dello spazio degli indirizzi virtuali di un processo.</figcaption>
+   </figure> 
 </div>
 
 ### Page Tables
+
+Le tabelle delle pagine sono il meccanismo attraverso il quale il sistema operativo controlla il significato degli indirizzi di memoria. Consentono a xv6 di multiplexare gli spazi degli indirizzi di processi diversi su una singola memoria fisica e di proteggere le memorie di processi diversi. Xv6 utilizza principalmente le tabelle delle pagine per multiplexare gli spazi degli indirizzi e proteggere la memoria. Utilizza anche alcune semplici astuzie con le tabelle delle pagine: mappare la stessa memoria (il kernel) in diversi spazi degli indirizzi, mappare la stessa memoria più di una volta in uno spazio degli indirizzi (ogni pagina utente è anche mappata nella vista fisica della memoria del kernel) e proteggere uno stack utente con una pagina non mappata.
+
+<div align="center">
+    <figure>
+     <img src="Immagini\xv6\pagetable.jpg" width="426" height="212">
+        <figcaption>Figura 4: Page table di x86</figcaption>
+   </figure> 
+</div>
+
+le istruzioni x86 (sia utente che kernel) manipolano indirizzi virtuali. La RAM della macchina, o memoria fisica, è indicizzata con indirizzi fisici. L'hardware di paginazione x86 collega questi due tipi di indirizzi, mappando ogni indirizzo virtuale in un indirizzo fisico. Una tabella delle pagine x86 è logicamente un array di 2^20 (1.048.576) page table entries (PTEs). Ogni PTE contiene un numero di physical page number (PPN) di 20 bit e alcune bandiere. L'hardware di paginazione traduce un indirizzo virtuale utilizzando i suoi primi 20 bit per indicizzare la tabella delle pagine e trovare una PTE, sostituendo i primi 20 bit dell'indirizzo con il PPN nella PTE.
+
+La traduzione effettiva avviene in due fasi. Una tabella delle pagine è memorizzata in memoria fisica come un albero a due livelli. La radice dell'albero è un page directory di 4096 byte che contiene 1024 riferimenti simili a PTE a pagine di tabella delle pagine. Ogni pagina di tabella delle pagine è un array di 1024 PTE da 32 bit. L'hardware di paginazione utilizza i primi 10 bit di un indirizzo virtuale per selezionare un ingresso del page directory. Se sia l'ingresso del page directory che la PTE non sono presenti, l'hardware di paginazione genera una eccezione. 
 
 ### Traps ans Interrupts
 
@@ -107,3 +126,8 @@ Quando un processo effettua una chiamata di sistema, il processore passa allo st
 - **Portabilità**:
 
       Xv6 è progettato per essere eseguibile su architetture x86, facilitando la sua adozione e utilizzo su diverse piattaforme hardware.
+
+
+
+### Sources:
+https://pdos.csail.mit.edu/6.828/2018/xv6/book-rev11.pdf
