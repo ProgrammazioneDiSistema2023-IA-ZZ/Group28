@@ -1,38 +1,66 @@
-# Analisi comparativa tra OS161 e xv6
+# Analisi comparativa tra Os161 e Xv6
 
 #### Sources:
 https://clownote.github.io/2021/02/27/xv6/Xv6-operating-system-organization/
 https://pdos.csail.mit.edu/6.828/2018/xv6/book-rev11.pdf
 
 ## Introduzione
-Attraverso questa analisi comparativa, si mira a fornire una panoramica delle capacità di OS161 e xv6, ponendo una particolare attenzione sulle differenze e sulle similarità di questi due sistemi operativi open source.
 
-## xv6
+Questo studio si concentra principalmente sull'analisi del sistema operativo Xv6, confrontandolo con Os161. L'obiettivo di questa analisi comparativa è offrire una panoramica delle capacità di Os161 e Xv6, mettendo in evidenza le differenze e le somiglianze tra questi due sistemi operativi open source.
 
-Così come OS161, xv6 è un sistema operativo nato con scopi didattici, sviluppato presso il MIT, che si propone come un sistema operativo semplice e leggero, ma allo stesso tempo completo e funzionale. É basato su UNIX V6, da cui prende il nome, realizzato in C e assembly. La prima versione del 2006 è progettata per essere eseguibile su architetture x86, mentre nella versione del 2020 è stata realizzata una conversione per RISC-V. 
+## Xv6
+
+Così come Os161, Xv6 è un sistema operativo nato con scopi didattici, sviluppato presso il MIT, che si propone come un sistema operativo semplice e leggero, ma allo stesso tempo completo e funzionale. É basato su UNIX V6, da cui prende il nome, realizzato in C e assembly. La prima versione del 2006 è progettata per essere eseguibile su architetture x86, mentre nella versione del 2020 è stata realizzata una conversione per RISC-V. 
 La versione che abbiamo scelto di analizzare è quella del 2006 per x86.
 
 Le funzioni chiave oggetto di studio includono system calls, meccanismi di sincronizzazione, gestione della memoria virtuale e della MMU, algoritmi di scheduling, oltre a esaminare altre caratteristiche rilevanti per il corretto funzionamento di un sistema operativo. 
 
-![Alt text](Immagini\xv6\os.jpg)
+### Organizzazione del Kernel
 
-Le principali caratteristiche di xv6 sono:
+Il sistema operativo è organizzato in modo che risieda tutto all'interno del kernel in modo che le implementazioni di tutte le chiamate di sistema vengano eseguite in modalità kernel. Questa organizzazione è chiamata kernel monolitico.
+
+![Kernel Monolitico](Immagini\xv6\monolithic.jpg)
+
+In questa organizzazione, l'intero sistema operativo viene eseguito con pieno privilegio hardware. Questa organizzazione è conveniente perché il progettista del sistema operativo non deve decidere quale parte del sistema operativo non ha bisogno di pieno privilegio hardware. Inoltre, è facile per diverse parti del sistema operativo cooperare. Ad esempio, un sistema operativo potrebbe avere una cache di buffer che può essere condivisa sia dal sistema di file che dal sistema di memoria virtuale.
+
+Un inconveniente dell'organizzazione monolitica è che le interfacce tra le diverse parti del sistema operativo sono spesso complesse, ed è quindi facile per uno sviluppatore del sistema operativo commettere un errore. In un kernel monolitico, un errore è fatale, perché un errore in modalità kernel spesso comporta il fallimento del kernel. Se il kernel fallisce, il computer smette di funzionare e, di conseguenza, tutte le applicazioni falliscono. Il computer deve essere riavviato per ripartire.
+
+Per ridurre il rischio di errori nel kernel, i progettisti del sistema operativo possono minimizzare la quantità di codice del sistema operativo che viene eseguita in modalità kernel ed eseguire la maggior parte del sistema operativo in modalità utente. Questa organizzazione del kernel è chiamata microkernel. 
+
+![Microkernel](Immagini\xv6\microkernel.jpg)
+
+Nella figura, il sistema di file viene eseguito come processo a livello utente. I servizi del sistema operativo eseguiti come processi sono chiamati server. Per consentire alle applicazioni di interagire con il file server, il kernel fornisce un meccanismo di comunicazione tra processi per inviare messaggi da un processo a livello utente a un altro.
+
+In un microkernel, l'interfaccia del kernel consiste in alcune funzioni a basso livello per avviare applicazioni, inviare messaggi, accedere all'hardware del dispositivo, ecc. Questa organizzazione consente al kernel di essere relativamente semplice, poiché la maggior parte del sistema operativo risiede nei server a livello utente.
+
+Xv6 è implementato come un kernel monolitico, seguendo la maggior parte dei sistemi operativi Unix. Pertanto, in xv6, l'interfaccia del kernel corrisponde all'interfaccia del sistema operativo e il kernel implementa l'intero sistema operativo. Poiché xv6 non fornisce molti servizi, il suo kernel è più piccolo di alcuni microkernel.
+
+#### Processi
+
+I processi vanno in xv6 a costituire l'unità fondamentale di isolamento. L'astrazione del processo fornisce l'illusione a un programma che esso abbia la sua stessa macchina privata. Un processo fornisce a un programma ciò che sembra essere un sistema di memoria privato, o spazio degli indirizzi, che altri processi non possono leggere o scrivere. Un processo fornisce anche al programma ciò che sembra essere la sua stessa CPU per eseguire le istruzioni del programma.
+
+Xv6 utilizza le tabelle delle pagine (implementate dall'hardware) per dare a ogni processo il suo spazio degli indirizzi. La tabella delle pagine x86 mappa un indirizzo virtuale in un indirizzo fisico.
+
+###
+
+### Riassunto delle principali caratteristiche
+
 
 - **Struttura Simplice**:
 
-      xv6 è progettato con un'architettura relativamente semplice e compatta, facilitando la comprensione e lo studio dei principi fondamentali dei sistemi operativi.
+      Xv6 è progettato con un'architettura relativamente semplice e compatta, facilitando la comprensione e lo studio dei principi fondamentali dei sistemi operativi.
 
 - **Unix V6 Heritage**:
         
-      xv6 trae ispirazione da Unix V6, che è stato uno dei primi sistemi operativi Unix sviluppati presso i laboratori Bell nel 1975. Mantenendo una certa coerenza con il suo predecessore, xv6 offre una prospettiva storica dei concetti fondamentali dei sistemi operativi.
+      Xv6 trae ispirazione da Unix V6, che è stato uno dei primi sistemi operativi Unix sviluppati presso i laboratori Bell nel 1975. Mantenendo una certa coerenza con il suo predecessore, Xv6 offre una prospettiva storica dei concetti fondamentali dei sistemi operativi.
 
 - **Kernel Monolitico**:
             
-      xv6 adotta un'architettura monolitica, dove il kernel è una singola immagine eseguibile che gestisce direttamente tutte le funzioni del sistema operativo. Questo facilita l'avvio e la comprensione, ma potrebbe limitare la modularità in confronto ad altri design.
+      Xv6 adotta un'architettura monolitica, dove il kernel è una singola immagine eseguibile che gestisce direttamente tutte le funzioni del sistema operativo. Questo facilita l'avvio e la comprensione, ma potrebbe limitare la modularità in confronto ad altri design.
 
 - **Gestione della Memoria**:
   
-      Implementa un sistema di gestione della memoria basato su paging. xv6 include concetti come l'allocazione dinamica della memoria e la gestione degli spazi degli indirizzi per i processi.
+      Implementa un sistema di gestione della memoria basato su paging. Xv6 include concetti come l'allocazione dinamica della memoria e la gestione degli spazi degli indirizzi per i processi.
 
 - **Gestione dei Processi**:
      
@@ -44,7 +72,7 @@ Le principali caratteristiche di xv6 sono:
 
 - **Interfaccia di Sistema (System Call)**:
  
-      xv6 implementa un insieme essenziale di chiamate di sistema (system call) che consentono ai processi di interagire con il kernel. Queste system call includono operazioni di I/O, gestione dei processi e gestione della memoria.
+      Xv6 implementa un insieme essenziale di chiamate di sistema (system call) che consentono ai processi di interagire con il kernel. Queste system call includono operazioni di I/O, gestione dei processi e gestione della memoria.
 
 - **Sincronizzazione e Semafori**:
  
@@ -56,4 +84,4 @@ Le principali caratteristiche di xv6 sono:
 
 - **Portabilità**:
 
-      xv6 è progettato per essere eseguibile su architetture x86, facilitando la sua adozione e utilizzo su diverse piattaforme hardware.
+      Xv6 è progettato per essere eseguibile su architetture x86, facilitando la sua adozione e utilizzo su diverse piattaforme hardware.
