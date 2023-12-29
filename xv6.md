@@ -221,41 +221,29 @@ Il codice della pianificazione acquisisce e rilascia ptable.lock per mantenere l
 
       Xv6 è progettato con un'architettura relativamente semplice e compatta, facilitando la comprensione e lo studio dei principi fondamentali dei sistemi operativi.
 
-- **Unix V6 Heritage**:
-        
-      Xv6 trae ispirazione da Unix V6, che è stato uno dei primi sistemi operativi Unix sviluppati presso i laboratori Bell nel 1975. Mantenendo una certa coerenza con il suo predecessore, Xv6 offre una prospettiva storica dei concetti fondamentali dei sistemi operativi.
-
 - **Kernel Monolitico**:
             
-      Xv6 adotta un'architettura monolitica, dove il kernel è una singola immagine eseguibile che gestisce direttamente tutte le funzioni del sistema operativo. Questo facilita l'avvio e la comprensione, ma potrebbe limitare la modularità in confronto ad altri design.
+      Xv6 è un kernel monolitico, il che significa che l'intero sistema operativo opera in modalità kernel. Questo design semplifica la cooperazione tra diverse parti del sistema.
 
 - **Gestione della Memoria**:
   
-      Implementa un sistema di gestione della memoria basato su paging. Xv6 include concetti come l'allocazione dinamica della memoria e la gestione degli spazi degli indirizzi per i processi.
+      Implementa un sistema di gestione della memoria basato su paging. Le tabelle delle pagine consentono il controllo degli indirizzi di memoria, permettendo a Xv6 di multiplexare gli spazi degli indirizzi di processi diversi su una singola memoria fisica e proteggere le memorie di processi diversi.
 
 - **Gestione dei Processi**:
      
-      Utilizza un modello di gestione dei processi basato su fork e exec, seguendo il modello di Unix. La creazione e l'esecuzione dei processi sono concettualmente simili a quanto presente in Unix.
+      Utilizza un modello di gestione dei processi basato su fork e exec, seguendo il modello di Unix.Ogni processo ha il proprio spazio degli indirizzi virtuale e fisico, gestito attraverso tabelle delle pagine. I processi sono l'unità fondamentale di isolamento in Xv6. Forniscono un'illusione di una macchina privata con memoria e CPU dedicate.
 
-- **File System**:
+- **System Call, Exceptions e Interrupts**:
  
-      Fornisce un sistema di file semplificato, ispirato a quello presente in Unix V6. Include concetti come la gestione di directory, la lettura e scrittura di file, e altre operazioni di base di un sistema di file.
+      Xv6 gestisce system call, eccezioni e interrupts attraverso un meccanismo comune. Le interfacce di sistema sono implementate tramite trap (o interrupt), e il kernel decide come gestire l'evento in base al numero di trap.
 
-- **Interfaccia di Sistema (System Call)**:
+- **Sincronizzazione**:
  
-      Xv6 implementa un insieme essenziale di chiamate di sistema (system call) che consentono ai processi di interagire con il kernel. Queste system call includono operazioni di I/O, gestione dei processi e gestione della memoria.
+      Xv6 utilizza spin-lock e sleep-lock per garantire l'accesso esclusivo alle risorse condivise tra i processi. Gli spin-lock sono utilizzati in sezioni critiche di breve durata, mentre gli sleep-lock supportano il rilascio temporaneo del processore.
 
-- **Sincronizzazione e Semafori**:
+- **Scheduling**:
  
-      Contiene meccanismi di sincronizzazione, come semafori, che possono essere utilizzati per coordinare l'accesso concorrente alle risorse condivise.
-
-- **Scheduler**:
- 
-      Implementa un semplice scheduler a round-robin per la gestione dei processi. Anche se di base, fornisce una base per la sperimentazione con diversi algoritmi di scheduling.
-
-- **Portabilità**:
-
-      Xv6 è progettato per essere eseguibile su architetture x86, facilitando la sua adozione e utilizzo su diverse piattaforme hardware.
+      Xv6 utilizza un algoritmo di scheduling a round-robin, assegnando a ciascun processo un quantum di tempo. Il meccanismo di sleep e wakeup gestisce la transizione tra i processi.
 
 ## Confronto tra Os161 e Xv6
 
