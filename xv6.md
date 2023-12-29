@@ -63,31 +63,77 @@ Le tabelle delle pagine sono il meccanismo attraverso il quale il sistema operat
 
 <div align="center">
     <figure>
-     <img src="Immagini\xv6\pagetable.jpg" width="426" height="212">
+     <img src="Immagini\xv6\pagetable.jpg" width="624" height="647">
         <figcaption>Figura 4: Page table di x86</figcaption>
    </figure> 
 </div>
 
-le istruzioni x86 (sia utente che kernel) manipolano indirizzi virtuali. La RAM della macchina, o memoria fisica, è indicizzata con indirizzi fisici. L'hardware di paginazione x86 collega questi due tipi di indirizzi, mappando ogni indirizzo virtuale in un indirizzo fisico. Una tabella delle pagine x86 è logicamente un array di 2^20 (1.048.576) page table entries (PTEs). Ogni PTE contiene un numero di physical page number (PPN) di 20 bit e alcune bandiere. L'hardware di paginazione traduce un indirizzo virtuale utilizzando i suoi primi 20 bit per indicizzare la tabella delle pagine e trovare una PTE, sostituendo i primi 20 bit dell'indirizzo con il PPN nella PTE.
+Le istruzioni x86 (sia utente che kernel) manipolano indirizzi virtuali. La RAM della macchina, o memoria fisica, è indicizzata con indirizzi fisici. L'hardware di paginazione x86 collega questi due tipi di indirizzi, mappando ogni indirizzo virtuale in un indirizzo fisico. Una tabella delle pagine x86 è logicamente un array di 2^20 (1.048.576) page table entries (PTEs). Ogni PTE contiene un numero di physical page number (PPN) di 20 bit e alcune bandiere. L'hardware di paginazione traduce un indirizzo virtuale utilizzando i suoi primi 20 bit per indicizzare la tabella delle pagine e trovare una PTE, sostituendo i primi 20 bit dell'indirizzo con il PPN nella PTE.
 
 La traduzione effettiva avviene in due fasi. Una tabella delle pagine è memorizzata in memoria fisica come un albero a due livelli. La radice dell'albero è un page directory di 4096 byte che contiene 1024 riferimenti simili a PTE a pagine di tabella delle pagine. Ogni pagina di tabella delle pagine è un array di 1024 PTE da 32 bit. L'hardware di paginazione utilizza i primi 10 bit di un indirizzo virtuale per selezionare un ingresso del page directory. Se sia l'ingresso del page directory che la PTE non sono presenti, l'hardware di paginazione genera una eccezione. 
 
-### Traps ans Interrupts
+### System Call, Exceptions e Interrupts
 
-### System Calls
+Esistono tre casi in cui il controllo deve passare da un programma utente al kernel:
+1. Una **System Call**: quando un programma utente richiede un servizio del sistema operativo. 
+2. Un **Exception**: quando un programma compie un'azione illegale. Esempi di azioni illegali includono divisione per zero, tentativo di accedere alla memoria per una voce di tabella delle pagine che non è presente, e così via.
+3. Un **Interrupt**: quando un dispositivo genera un segnale per indicare che necessita dell'attenzione del sistema operativo. 
+ 
+In tutti e tre i casi, il design del sistema operativo deve predisporre quanto segue. Il sistema deve salvare i registri del processore per un futuro ripristino trasparente. Il sistema deve essere configurato per l'esecuzione nel kernel. Il sistema deve scegliere un punto in cui far iniziare l'esecuzione del kernel. Il kernel deve essere in grado di recuperare informazioni sull'evento, ad esempio gli argomenti della chiamata di sistema. Tutto deve essere fatto in modo sicuro; il sistema deve mantenere l'isolamento tra i processi utente e il kernel.
 
-### Memory Management
+Per raggiungere questo obiettivo, il sistema operativo deve essere consapevole dei dettagli su come l'hardware gestisce le chiamate di sistema, le eccezioni e le interruzioni. Nella maggior parte dei processori, questi tre eventi sono gestiti da un unico meccanismo hardware. Ad esempio, sull'x86, un programma invoca una chiamata di sistema generando un'interruzione mediante l'istruzione *int*. Allo stesso modo, le eccezioni generano anch'esse un'interruzione. Pertanto, se il sistema operativo ha un piano per la gestione delle interruzioni, può gestire anche chiamate di sistema ed eccezioni.
+
+Una nota sulla terminologia: anche se il termine ufficiale x86 è eccezione, xv6 utilizza il termine trap, principalmente perché era il termine utilizzato dal PDP11/40 ed è quindi il termine Unix convenzionale. É importante ricordare che le trap sono causate dal processo corrente in esecuzione su un processore (ad esempio, il processo effettua una chiamata di sistema e genera di conseguenza una trap), mentre le interruzioni sono causate dai dispositivi e potrebbero non essere correlate al processo in esecuzione al momento dell'interruzione.
+
+#### Codice
+
+Lo scatenarsi di una trap avviene a livello assembly con l'uso del comando *int n* dove n è il numero della trap. La prima cosa che viene fatta è il context switching, ovvero il passaggio da user mode a kernel mode. In seguito viene chiamata la funzione C trap che guarda al trap number e decide se è una system call, un'eccezione o un'interrupt. In base a questo viene chiamata la funzione corrispondente. 
+
+#### Gestori di trap in Assembly
+
+L'x86 consente 256 diverse interruzioni. Le interruzioni da 0 a 31 sono definite per eccezioni software, come errori di divisione o tentativi di accesso a indirizzi di memoria non validi. Xv6 mappa le 32 interruzioni hardware nell'intervallo da 32 a 63 e utilizza l'interruzione 64 come interruzione di chiamata di sistema.
+
+Tvinit, chiamata da main, imposta le 256 voci nella tabella IDT (Interrupt Descriptor Table). L'interruzione i è gestita dal codice all'indirizzo in vectors[i]. Ogni punto di ingresso è diverso, poiché l'x86 non fornisce il numero di trap all'handler di interruzione. Utilizzare 256 handler diversi è l'unico modo per distinguere i 256 casi.
+
+Tvinit gestisce in modo particolare T_SYSCALL, la trap di chiamata di sistema dell'utente: specifica che il gate è di tipo 'trap' passando un valore di 1 come secondo argomento. I gate di trap non cancellano il flag IF, consentendo altre interruzioni durante l'handler della chiamata di sistema.
+
+Xv6 programma l'hardware x86 per eseguire uno switch di stack su una trap impostando un descrittore del segmento di attività attraverso il quale l'hardware carica un selettore di segmento di stack e un nuovo valore per %esp. La funzione *switchuvm* memorizza l'indirizzo della cima dello stack del kernel del processo utente nel descrittore del segmento di attività.
+
+<div align="center">
+    <figure>
+     <img src="Immagini\xv6\intkstack.jpg" width="371" height="218">
+        <figcaption>Figura 5: Stack del Kernel dopo una chiamata <i>int</i></figcaption>
+   </figure> 
+</div>
+
+Quando si verifica una trap, l'hardware del processore esegue le seguenti operazioni. Se il processore stava eseguendo in modalità utente, carica %esp e %ss dal descrittore del segmento di attività, spinge il vecchio %ss utente e %esp sul nuovo stack. Se il processore stava eseguendo in modalità kernel, nulla di quanto sopra accade. Il processore poi spinge i registri %eflags, %cs e %eip. Per alcune trap (ad esempio, un page fault), il processore spinge anche una parola di errore. Il processore carica quindi %eip e %cs dall'entry corrispondente nella IDT. Xv6 utilizza uno script Perl per generare i punti di ingresso a cui puntano le voci della IDT. Ciascuna voce spinge un codice di errore se il processore non lo ha fatto, spinge il numero di interruzione e quindi salta a *alltraps*. Alltraps salva i registri del processore in modalità utente, carica il descrittore del segmento di attività del kernel e salta a trap andando così ad eseguire il codice C del kernel.
+In seguito il frame di trap ripristina i registri in modalità utente e quindi iret salta di nuovo nello spazio utente.
+Nel caso di trap verificatesi durante l'esecuzione del kernel il processore non esegue lo switch di stack. 
+
+#### Gestori di trap in C
+
+Trap osserva il numero di trap dell'hardware tf->trapno per decidere il motivo per cui è stato chiamato e cosa deve essere fatto. Se la trap è T_SYSCALL, trap chiama il gestore di chiamate di sistema syscall. Dopo aver verificato la chiamata di sistema, come secondo caso considerato trap cerca interruzioni hardware. In ultimo trap assume che l'interruzione sia stata causata da un comportamento incorretto. In questo caso, se è stata causata da un programma utente Xv6 stampa i dettagli e imposta proc->killed per terminare il processo. Se la trap è stata causata dal kernel, Xv6 stampa un messaggio di errore e chiama panic per terminare il kernel.
+
+#### Codice: System Call
+
+Per le chiamate di sistema, trap invoca *syscall*. Syscall carica il numero di chiamata di sistema dal frame di trap, che contiene il valore salvato in %eax, e indice le tabelle delle chiamate di sistema. Per la prima chiamata di sistema, %eax contiene il valore SYS_exec, e syscall invocherà l'entrata SYS_exec-esima della tabella delle chiamate di sistema, corrispondente all'invocazione di sys_exec.
+
+Quando exec ritorna, restituirà il valore restituito dal gestore di chiamate di sistema (3708). Le chiamate di sistema restituiscono convenzionalmente numeri negativi per indicare errori, numeri positivi per indicare successo.
+
+--- Si può scrivere di più ---
 
 ### Synchronization
 
+
+
 ### Scheduling
 
-### File System 
+
 
 ### Riassunto delle principali caratteristiche
 
 
-- **Struttura Simplice**:
+- **Struttura Semplice**:
 
       Xv6 è progettato con un'architettura relativamente semplice e compatta, facilitando la comprensione e lo studio dei principi fondamentali dei sistemi operativi.
 
