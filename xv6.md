@@ -120,8 +120,6 @@ Per le chiamate di sistema, trap invoca *syscall*. Syscall carica il numero di c
 
 Quando exec ritorna, restituirà il valore restituito dal gestore di chiamate di sistema (3708). Le chiamate di sistema restituiscono convenzionalmente numeri negativi per indicare errori, numeri positivi per indicare successo.
 
---- Si può scrivere di più ---
-
 ### Synchronization
 
 Xv6 è progettato per eseguire su multiprocessori: computer con più CPU che eseguono operazioni in modo indipendente. Queste CPU condividono la RAM fisica e Xv6 sfrutta questa condivisione per mantenere strutture dati a cui tutte le CPU accedono in lettura e scrittura. Per evitare che le CPU si sovrappongano e corrompano le strutture dati, Xv6 utilizza meccanismi di sincronizzazione per coordinare l'accesso concorrente alle strutture dati condivise. Questi meccanismi di sincronizzazione includono semafori e lock. 
@@ -154,24 +152,24 @@ La funzione release (1602) è l'opposto di acquire: cancella i campi di debug e 
 
 <div align="center"> 
       <b>Lock in Xv6</b>
+
+| Lock            | Descrizione                                             |
+| --------------- | ------------------------------------------------------- |
+| bcache.lock     | Protegge l'allocazione delle voci della cache del buffer del blocco        |
+| cons.lock       | Serializza l'accesso all'hardware della console, evita l'output intersperso |
+| ftable.lock     | Serializza l'allocazione di una struct file nella tabella dei file   |
+| icache.lock     | Protegge l'allocazione delle voci della cache dell'inode              |
+| idelock         | Serializza l'accesso all'hardware del disco e alla coda del disco       |
+| kmem.lock       | Serializza l'allocazione di memoria                         |
+| log.lock        | Serializza le operazioni sul log delle transazioni            |
+| pipe's p->lock  | Serializza le operazioni su ogni pipe                       |
+| ptable.lock     | Serializza il cambio di contesto e le operazioni su proc->state e proctable |
+| tickslock       | Serializza le operazioni sul contatore dei ticks              |
+| inode's ip->lock| Serializza le operazioni su ogni inode e sul suo contenuto      |
+| buf's b->lock   | Serializza le operazioni su ogni buffer del blocco              |
 </div>
 
-| Lock            | Description                                             |
-| --------------- | ------------------------------------------------------- |
-| bcache.lock     | Protects allocation of block buffer cache entries        |
-| cons.lock       | Serializes access to console hardware, avoids intermixed output |
-| ftable.lock     | Serializes allocation of a struct file in file table     |
-| icache.lock     | Protects allocation of inode cache entries              |
-| idelock         | Serializes access to disk hardware and disk queue       |
-| kmem.lock       | Serializes allocation of memory                         |
-| log.lock        | Serializes operations on the transaction log            |
-| pipe's p->lock  | Serializes operations on each pipe                       |
-| ptable.lock     | Serializes context switching, and operations on proc->state and proctable |
-| tickslock       | Serializes operations on the ticks counter              |
-| inode's ip->lock| Serializes operations on each inode and its content      |
-| buf's b->lock   | Serializes operations on each block buffer              |
-
-###### Esempio Interrupt handler:
+*Esempio per l'Interrupt Handler:*
 
 Nel momento in cui uno spin-lock viene utilizzato da un gestore di interruzioni, un processore non deve mai detenere quel lock con le interruzioni abilitate. Xv6 ha un atteggiamento conservativo, infatti quando un processore entra in una sezione critica di spin-lock, Xv6 si assicura sempre che le interruzioni siano disabilitate su quel processore. Le interruzioni possono ancora verificarsi su altri processori, quindi l'acquisizione di un'interruzione può attendere che un thread rilasci uno spin-lock; solo non sullo stesso processore. Xv6 riabilita le interruzioni quando un processore non detiene spin-lock; deve fare un po' di registrazione per gestire le sezioni critiche nidificate. 
 
@@ -187,7 +185,34 @@ Xv6 utilizza spin-lock nella maggior parte delle situazioni, poiché hanno un ba
 
 ### Scheduling
 
+Ogni sistema operativo deve adottare un algoritmo di scheduling per decidere quale processo eseguire. Questo perché, anche in condizioni di muliprocessore, il numero di processi da eseguire sono maggiori del numero di processori disponibili. Xv6 utilizza un semplice algoritmo di scheduling a round-robin, che assegna a ciascun processo un intervallo di tempo fisso, chiamato quantum, durante il quale il processo può eseguire. Quando il quantum di un processo scade, Xv6 interrompe il processo e sceglie un altro processo da eseguire. É un algoritmo a priorità fissa in quanto tutti i processi hanno la stessa importanza nell'essere eseguiti.
 
+#### Multiplexing
+
+Xv6 attua il *multiplexing* passando ciascun processore da un processo a un altro in due situazioni. In primo luogo, il meccanismo di *sleep* e *wakeup* di Xv6 cambia quando un processo attende il completamento di I/O su dispositivi o pipe, o attende l'uscita di un processo figlio, o attende nella chiamata di sistema sleep. In secondo luogo, Xv6 forza periodicamente un cambio quando un processo sta eseguendo istruzioni utente. Questo multiplexing crea l'illusione che ciascun processo abbia il proprio processore, proprio come Xv6 utilizza l'allocazione di memoria e le tabelle di pagina hardware per creare l'illusione che ciascun processo abbia la propria memoria.
+
+#### Context switching
+
+<div id="Figure 6" align="center">
+    <figure>
+     <img src="Immagini\xv6\switch.jpg" width="348" height="208">
+        <figcaption>Figura 6: Switch da un processo utente ad un altro.</figcaption>
+   </figure> 
+</div>
+
+La <A href="#Figure 6">Figura 6</A> illustra i passaggi coinvolti nel passaggio da un processo utente a un altro: una transizione utente-nucleo (chiamata di sistema o interruzione) al thread kernel del vecchio processo, un cambio di contesto al thread scheduler della CPU corrente, un cambio di contesto al thread kernel di un nuovo processo e un ritorno alla trappola al processo a livello utente. Lo scheduler di xv6 ha il suo thread (registri e stack salvati) perché talvolta non è sicuro che possa eseguire su uno stack kernel di qualsiasi processo.
+
+Il passaggio da un thread a un altro comporta il salvataggio dei registri CPU del vecchio thread e il ripristino dei registri precedentemente salvati del nuovo thread; il fatto che %esp e %eip siano salvati e ripristinati significa che la CPU cambierà gli stack e cambierà il codice che sta eseguendo.
+
+La funzione *swtch* esegue il salvataggio e il ripristino per un cambio di thread. Ogni contesto è rappresentato da un struct context*, un puntatore a una struttura memorizzata nello stack kernel coinvolto. Swtch prende due argomenti: struct context **old e struct context *new. Inserisce i registri correnti nello stack e salva il puntatore dello stack in *old. Quindi swtch copia new in %esp, estrae i registri precedentemente salvati e restituisce.
+
+#### Scheduling
+
+Un processo che desidera cedere la CPU deve acquisire il lock della tabella dei processi **ptable.lock**, rilasciare eventuali altri lock che sta tenendo, aggiornare il proprio stato (*proc->state*) e quindi chiamare *sched*. Quest'ultimo verifica le condizioni necessarie, tra cui l'assenza di altri lock e la disabilitazione degli interrupt, e quindi chiama *swtch* per passare al contesto dello scheduler. Lì, avviene la selezione di un nuovo processo eseguibile, seguito da un nuovo passaggio di contesto attraverso swtch, che porta l'esecuzione al nuovo processo.
+
+Una caratteristica unica è l'uso di ptable.lock attraverso le chiamate a swtch, anche se questo va contro la convenzione di rilasciare il lock nel thread che l'ha acquisito. Tuttavia, questo approccio è necessario per proteggere invarianti critiche sui campi di stato e contesto del processo durante swtch.
+
+Il codice della pianificazione acquisisce e rilascia ptable.lock per mantenere la coerenza degli stati dei processi. Inoltre, la sua struttura è progettata per far rispettare invarianti cruciali su ciascun processo. L'acquisizione e il rilascio del lock avvengono in thread diversi per garantire che gli invarianti siano rispettati durante le transizioni di stato.
 
 ### Riassunto delle principali caratteristiche
 
