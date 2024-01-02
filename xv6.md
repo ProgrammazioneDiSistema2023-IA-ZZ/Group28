@@ -18,8 +18,9 @@ Il sistema operativo è organizzato in modo che risieda tutto all'interno del ke
 <div align="center">
     <figure>
      <img src="Immagini\xv6\monolithic.jpg" width="291" height="189">
-         <figcaption>Figura 1: Kernel monolitico</figcaption>
-   </figure> 
+    </figure> 
+     
+  Figura 1: Kernel monolitico
 </div>
 
 In questa organizzazione, l'intero sistema operativo viene eseguito con pieno privilegio hardware. Questa organizzazione è conveniente perché il progettista del sistema operativo non deve decidere quale parte del sistema operativo non ha bisogno di pieno privilegio hardware. Inoltre, è facile per diverse parti del sistema operativo cooperare. Ad esempio, un sistema operativo potrebbe avere una cache di buffer che può essere condivisa sia dal sistema di file che dal sistema di memoria virtuale.
@@ -31,8 +32,9 @@ Per ridurre il rischio di errori nel kernel, i progettisti del sistema operativo
 <div id="Figure 2" align="center">
     <figure>
      <img src="Immagini\xv6\microkernel.jpg" width="340" height="134">
-        <figcaption>Figura 2: Microkernel</figcaption>
    </figure> 
+
+Figura 2: Microkernel
 </div>
 
 Nella <A href="#Figure 2">figura</A>, il sistema di file viene eseguito come processo a livello utente. I servizi del sistema operativo eseguiti come processi sono chiamati server. Per consentire alle applicazioni di interagire con il file server, il kernel fornisce un meccanismo di comunicazione tra processi per inviare messaggi da un processo a livello utente a un altro.
@@ -53,8 +55,9 @@ Quando un processo effettua una chiamata di sistema, il processore passa allo st
 <div align="center">
     <figure>
      <img src="Immagini\xv6\layout_virtual_address_space.jpg" width="426" height="212">
-        <figcaption>Figura 3: Layout dello spazio degli indirizzi virtuali di un processo.</figcaption>
    </figure> 
+
+Figura 3: Layout dello spazio degli indirizzi virtuali di un processo.
 </div>
 
 ### Page Tables
@@ -64,8 +67,9 @@ Le tabelle delle pagine sono il meccanismo attraverso il quale il sistema operat
 <div align="center">
     <figure>
      <img src="Immagini\xv6\pagetable.jpg" width="624" height="647">
-        <figcaption>Figura 4: Page table di x86</figcaption>
    </figure> 
+
+Figura 4: Page table di x86
 </div>
 
 Le istruzioni x86 (sia utente che kernel) manipolano indirizzi virtuali. La RAM della macchina, o memoria fisica, è indicizzata con indirizzi fisici. L'hardware di paginazione x86 collega questi due tipi di indirizzi, mappando ogni indirizzo virtuale in un indirizzo fisico. Una tabella delle pagine x86 è logicamente un array di 2^20 (1.048.576) page table entries (PTEs). Ogni PTE contiene un numero di physical page number (PPN) di 20 bit e alcune bandiere. L'hardware di paginazione traduce un indirizzo virtuale utilizzando i suoi primi 20 bit per indicizzare la tabella delle pagine e trovare una PTE, sostituendo i primi 20 bit dell'indirizzo con il PPN nella PTE.
@@ -102,8 +106,9 @@ Xv6 programma l'hardware x86 per eseguire uno switch di stack su una trap impost
 <div align="center">
     <figure>
      <img src="Immagini\xv6\intkstack.jpg" width="371" height="218">
-        <figcaption>Figura 5: Stack del Kernel dopo una chiamata <i>int</i></figcaption>
    </figure> 
+
+Figura 5: Stack del Kernel dopo una chiamata <i>int</i>
 </div>
 
 Quando si verifica una trap, l'hardware del processore esegue le seguenti operazioni. Se il processore stava eseguendo in modalità utente, carica %esp e %ss dal descrittore del segmento di attività, spinge il vecchio %ss utente e %esp sul nuovo stack. Se il processore stava eseguendo in modalità kernel, nulla di quanto sopra accade. Il processore poi spinge i registri %eflags, %cs e %eip. Per alcune trap (ad esempio, un page fault), il processore spinge anche una parola di errore. Il processore carica quindi %eip e %cs dall'entry corrispondente nella IDT. Xv6 utilizza uno script Perl per generare i punti di ingresso a cui puntano le voci della IDT. Ciascuna voce spinge un codice di errore se il processore non lo ha fatto, spinge il numero di interruzione e quindi salta a *alltraps*. Alltraps salva i registri del processore in modalità utente, carica il descrittore del segmento di attività del kernel e salta a trap andando così ad eseguire il codice C del kernel.
@@ -196,8 +201,9 @@ Xv6 attua il *multiplexing* passando ciascun processore da un processo a un altr
 <div id="Figure 6" align="center">
     <figure>
      <img src="Immagini\xv6\switch.jpg" width="348" height="208">
-        <figcaption>Figura 6: Switch da un processo utente ad un altro.</figcaption>
    </figure> 
+
+Figura 6: Switch da un processo utente ad un altro.
 </div>
 
 La <A href="#Figure 6">Figura 6</A> illustra i passaggi coinvolti nel passaggio da un processo utente a un altro: una transizione utente-nucleo (chiamata di sistema o interruzione) al thread kernel del vecchio processo, un cambio di contesto al thread scheduler della CPU corrente, un cambio di contesto al thread kernel di un nuovo processo e un ritorno alla trappola al processo a livello utente. Lo scheduler di xv6 ha il suo thread (registri e stack salvati) perché talvolta non è sicuro che possa eseguire su uno stack kernel di qualsiasi processo.
