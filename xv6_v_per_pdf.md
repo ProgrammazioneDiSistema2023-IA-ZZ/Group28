@@ -260,5 +260,5 @@ Il codice della pianificazione acquisisce e rilascia ptable.lock per mantenere l
 
 In generale, entrambi xv6 e OS/161 forniscono un'esperienza pratica nell'implementazione dei concetti chiave dei sistemi operativi, ma differiscono nell'approccio e nell'architettura di destinazione.
 
-### Sources:
+## Fonti
 https://pdos.csail.mit.edu/6.828/2018/xv6/book-rev11.pdf
