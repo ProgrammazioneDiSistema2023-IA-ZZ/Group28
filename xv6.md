@@ -37,7 +37,7 @@ Per ridurre il rischio di errori nel kernel, i progettisti del sistema operativo
 Figura 2: Microkernel
 </div>
 
-Nella <A href="#Figure 2">figura</A>, il sistema di file viene eseguito come processo a livello utente. I servizi del sistema operativo eseguiti come processi sono chiamati server. Per consentire alle applicazioni di interagire con il file server, il kernel fornisce un meccanismo di comunicazione tra processi per inviare messaggi da un processo a livello utente a un altro.
+Nella <A href="#Figure 2">Figura 2</A>, il sistema di file viene eseguito come processo a livello utente. I servizi del sistema operativo eseguiti come processi sono chiamati server. Per consentire alle applicazioni di interagire con il file server, il kernel fornisce un meccanismo di comunicazione tra processi per inviare messaggi da un processo a livello utente a un altro.
 
 In un microkernel, l'interfaccia del kernel consiste in alcune funzioni a basso livello per avviare applicazioni, inviare messaggi, accedere all'hardware del dispositivo, ecc. Questa organizzazione consente al kernel di essere relativamente semplice, poiché la maggior parte del sistema operativo risiede nei server a livello utente.
 
@@ -220,40 +220,51 @@ Una caratteristica unica è l'uso di ptable.lock attraverso le chiamate a swtch,
 
 Il codice della pianificazione acquisisce e rilascia ptable.lock per mantenere la coerenza degli stati dei processi. Inoltre, la sua struttura è progettata per far rispettare invarianti cruciali su ciascun processo. L'acquisizione e il rilascio del lock avvengono in thread diversi per garantire che gli invarianti siano rispettati durante le transizioni di stato.
 
-### Riassunto delle principali caratteristiche
-
+## Confronto tra Os161 e Xv6
 
 - **Struttura Semplice**:
 
-    - Xv6 è progettato con un'architettura relativamente semplice e compatta, facilitando la comprensione e lo studio dei principi fondamentali dei sistemi operativi.
+    - **Xv6**: É progettato con un'architettura relativamente semplice e compatta, facilitando la comprensione e lo studio dei principi fondamentali dei sistemi operativi.
+    - **Os161**: Analogamente, Os161 è progettato per l'istruzione e sviluppato presso l'Università di Harvard. Si concentra sull'apprendimento dei principi dei sistemi operativi.
 
-- **Kernel Monolitico**:
+- **Architettura di Destinazione**:
+
+    - **Xv6**: Inizialmente progettato per l'architettura x86. Successivamente, è stata sviluppata una versione per RISC-V.
+    - **Os161**: Supporta diverse architetture, inclusi MIPS, ARM e Intel.
+
+- **Organizzazione del Kernel**:
             
-    - Xv6 è un kernel monolitico, il che significa che l'intero sistema operativo opera in modalità kernel. Questo design semplifica la cooperazione tra diverse parti del sistema.
+    - **Xv6**: É un kernel monolitico, il che significa che l'intero sistema operativo opera in modalità kernel. Questo design semplifica la cooperazione tra diverse parti del sistema.
+    - **Os161**: Utilizza un'organizzazione a microkernel, dove solo le funzioni essenziali risiedono nel kernel, mentre i servizi aggiuntivi sono implementati come server a livello utente.
 
 - **Gestione della Memoria**:
   
-    - Implementa un sistema di gestione della memoria basato su paging. Le tabelle delle pagine consentono il controllo degli indirizzi di memoria, permettendo a Xv6 di multiplexare gli spazi degli indirizzi di processi diversi su una singola memoria fisica e proteggere le memorie di processi diversi.
+    - **Xv6**: Implementa un sistema di gestione della memoria basato su paging. Le tabelle delle pagine consentono il controllo degli indirizzi di memoria, permettendo a Xv6 di multiplexare gli spazi degli indirizzi di processi diversi su una singola memoria fisica e proteggere le memorie di processi diversi.
+    - **Os161**: Anche Os161 utilizza tabelle delle pagine e presenta concetti di gestione della memoria simili.
 
 - **Gestione dei Processi**:
      
-    - Utilizza un modello di gestione dei processi basato su fork e exec, seguendo il modello di Unix.Ogni processo ha il proprio spazio degli indirizzi virtuale e fisico, gestito attraverso tabelle delle pagine. I processi sono l'unità fondamentale di isolamento in Xv6. Forniscono un'illusione di una macchina privata con memoria e CPU dedicate.
+    - **Xv6**: I processi costituiscono l'unità fondamentale di isolamento. Ogni processo ha il proprio spazio degli indirizzi virtuale.
+    - **Os161**: Utilizza una struttura di processo simile, ma l'implementazione può variare a seconda dell'architettura di destinazione.macchina privata con memoria e CPU dedicate.
 
 - **System Call, Exceptions e Interrupts**:
  
-    - Xv6 gestisce system call, eccezioni e interrupts attraverso un meccanismo comune. Le interfacce di sistema sono implementate tramite trap (o interrupt), e il kernel decide come gestire l'evento in base al numero di trap.
+    - **Xv6**: Gestisce system call, eccezioni e interrupts attraverso un meccanismo comune. Le interfacce di sistema sono implementate tramite trap (o interrupt), e il kernel decide come gestire l'evento in base al numero di trap.
+    - **Os161**: Simile a xv6, gestisce system calls, interrupts ed exceptions in modo da facilitare l'esecuzione del sistema operativo.
 
 - **Sincronizzazione**:
  
-    - Xv6 utilizza spin-lock e sleep-lock per garantire l'accesso esclusivo alle risorse condivise tra i processi. Gli spin-lock sono utilizzati in sezioni critiche di breve durata, mentre gli sleep-lock supportano il rilascio temporaneo del processore.
+    - **Xv6**: Utilizza spin-lock e sleep-lock per garantire l'accesso esclusivo alle risorse condivise tra i processi. Gli spin-lock sono utilizzati in sezioni critiche di breve durata, mentre gli sleep-lock supportano il rilascio temporaneo del processore.
+    - **Os161**: Implementa meccanismi di sincronizzazione simili, come semafori e lock.
 
 - **Scheduling**:
  
-    - Xv6 utilizza un algoritmo di scheduling a round-robin, assegnando a ciascun processo un quantum di tempo. Il meccanismo di sleep e wakeup gestisce la transizione tra i processi.
+    - **Xv6**: Utilizza un algoritmo di scheduling a round-robin, assegnando a ciascun processo un quantum di tempo.
+    - **Os161**: Utilizza un algoritmo di scheduling simile, come round-robin o altri algoritmi in base alla configurazione.
 
-## Confronto tra Os161 e Xv6
+### Conclusioni
 
-
+In generale, entrambi xv6 e OS/161 forniscono un'esperienza pratica nell'implementazione dei concetti chiave dei sistemi operativi, ma differiscono nell'approccio e nell'architettura di destinazione.
 
 ### Sources:
 https://pdos.csail.mit.edu/6.828/2018/xv6/book-rev11.pdf
