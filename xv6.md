@@ -28,14 +28,14 @@ Un inconveniente dell'organizzazione monolitica è che le interfacce tra le dive
 
 Per ridurre il rischio di errori nel kernel, i progettisti del sistema operativo possono minimizzare la quantità di codice del sistema operativo che viene eseguita in modalità kernel ed eseguire la maggior parte del sistema operativo in modalità utente. Questa organizzazione del kernel è chiamata microkernel. 
 
-<div align="center">
+<div id="Figure 2" align="center">
     <figure>
      <img src="Immagini\xv6\microkernel.jpg" width="340" height="134">
         <figcaption>Figura 2: Microkernel</figcaption>
    </figure> 
 </div>
 
-Nella figura, il sistema di file viene eseguito come processo a livello utente. I servizi del sistema operativo eseguiti come processi sono chiamati server. Per consentire alle applicazioni di interagire con il file server, il kernel fornisce un meccanismo di comunicazione tra processi per inviare messaggi da un processo a livello utente a un altro.
+Nella <A href="#Figure 2">figura</A>, il sistema di file viene eseguito come processo a livello utente. I servizi del sistema operativo eseguiti come processi sono chiamati server. Per consentire alle applicazioni di interagire con il file server, il kernel fornisce un meccanismo di comunicazione tra processi per inviare messaggi da un processo a livello utente a un altro.
 
 In un microkernel, l'interfaccia del kernel consiste in alcune funzioni a basso livello per avviare applicazioni, inviare messaggi, accedere all'hardware del dispositivo, ecc. Questa organizzazione consente al kernel di essere relativamente semplice, poiché la maggior parte del sistema operativo risiede nei server a livello utente.
 
@@ -246,6 +246,8 @@ Il codice della pianificazione acquisisce e rilascia ptable.lock per mantenere l
       Xv6 utilizza un algoritmo di scheduling a round-robin, assegnando a ciascun processo un quantum di tempo. Il meccanismo di sleep e wakeup gestisce la transizione tra i processi.
 
 ## Confronto tra Os161 e Xv6
+
+
 
 ### Sources:
 https://pdos.csail.mit.edu/6.828/2018/xv6/book-rev11.pdf
