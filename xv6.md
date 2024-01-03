@@ -23,7 +23,7 @@ Il sistema operativo è organizzato in modo che risieda tutto all'interno del ke
   Figura 1: Kernel monolitico
 </div>
 
-In questa organizzazione, l'intero sistema operativo viene eseguito con pieno privilegio hardware. Questa organizzazione è conveniente perché il progettista del sistema operativo non deve decidere quale parte del sistema operativo non ha bisogno di pieno privilegio hardware. Inoltre, è facile per diverse parti del sistema operativo cooperare. Ad esempio, un sistema operativo potrebbe avere una cache di buffer che può essere condivisa sia dal sistema di file che dal sistema di memoria virtuale.
+In questa organizzazione, l'intero sistema operativo viene eseguito con pieno privilegio hardware. Questa organizzazione è conveniente perché il progettista del sistema operativo non deve decidere quale parte del sistema operativo non ha bisogno di pieno privilegio hardware. Inoltre, è facile per diverse parti del sistema operativo cooperare. Ad esempio, un sistema operativo potrebbe avere una cache di buffer che può essere condivisa sia dal file system che dal sistema di memoria virtuale.
 
 Un inconveniente dell'organizzazione monolitica è che le interfacce tra le diverse parti del sistema operativo sono spesso complesse, ed è quindi facile per uno sviluppatore del sistema operativo commettere un errore. In un kernel monolitico, un errore è fatale, perché un errore in modalità kernel spesso comporta il fallimento del kernel. Se il kernel fallisce, il computer smette di funzionare e, di conseguenza, tutte le applicazioni falliscono. Il computer deve essere riavviato per ripartire.
 
@@ -37,7 +37,7 @@ Per ridurre il rischio di errori nel kernel, i progettisti del sistema operativo
 Figura 2: Microkernel
 </div>
 
-Nella <A href="#Figure 2">Figura 2</A>, il sistema di file viene eseguito come processo a livello utente. I servizi del sistema operativo eseguiti come processi sono chiamati server. Per consentire alle applicazioni di interagire con il file server, il kernel fornisce un meccanismo di comunicazione tra processi per inviare messaggi da un processo a livello utente a un altro.
+Nella <A href="#Figure 2">Figura 2</A>, il file system viene eseguito come processo a livello utente. I servizi del sistema operativo eseguiti come processi sono chiamati server. Per consentire alle applicazioni di interagire con il file server, il kernel fornisce un meccanismo di comunicazione tra processi per inviare messaggi da un processo a livello utente a un altro.
 
 In un microkernel, l'interfaccia del kernel consiste in alcune funzioni a basso livello per avviare applicazioni, inviare messaggi, accedere all'hardware del dispositivo, ecc. Questa organizzazione consente al kernel di essere relativamente semplice, poiché la maggior parte del sistema operativo risiede nei server a livello utente.
 
@@ -186,7 +186,7 @@ Gli sleep-lock di Xv6 supportano il rilascio del processore durante le loro sezi
 
 A un livello elevato, uno sleep-lock ha un campo bloccato che è protetto da un spinlock, e la chiamata a sleep di acquiresleep cede atomicamente la CPU e rilascia lo spin-lock. Il risultato è che altri thread possono eseguire mentre acquiresleep aspetta. Poiché gli sleep-lock lasciano gli interrupt abilitati, non possono essere utilizzati negli interrupt. Inoltre, dato che acquiresleep può cedere il processore, gli sleep-lock non possono essere utilizzati all'interno di sezioni critiche di spin-lock
 
-Xv6 utilizza spin-lock nella maggior parte delle situazioni, poiché hanno un basso overhead. Utilizza gli sleep-lock solo nel sistema di file, dove è conveniente poter detenere i blocchi attraverso lunghe operazioni disco.
+Xv6 utilizza spin-lock nella maggior parte delle situazioni, poiché hanno un basso overhead. Utilizza gli sleep-lock solo nel file system, dove è conveniente poter detenere i blocchi attraverso lunghe operazioni disco.
 
 ### Scheduling
 
@@ -219,6 +219,82 @@ Un processo che desidera cedere la CPU deve acquisire il lock della tabella dei 
 Una caratteristica unica è l'uso di ptable.lock attraverso le chiamate a swtch, anche se questo va contro la convenzione di rilasciare il lock nel thread che l'ha acquisito. Tuttavia, questo approccio è necessario per proteggere invarianti critiche sui campi di stato e contesto del processo durante swtch.
 
 Il codice della pianificazione acquisisce e rilascia ptable.lock per mantenere la coerenza degli stati dei processi. Inoltre, la sua struttura è progettata per far rispettare invarianti cruciali su ciascun processo. L'acquisizione e il rilascio del lock avvengono in thread diversi per garantire che gli invarianti siano rispettati durante le transizioni di stato.
+
+#### Sleep e Wakeup
+
+Meccanismo di sincronizzazione che permette i procesi di interagire tra loro. Sleep e wakeup consentono ai processi nello stato di sleeping di dormire in attesa di un evento e ad un altro processo di svegliarlo una volta che l'evento è avvenuto. Questi meccanismi di coordinamento sono anche chiamati meccanismi di coordinamento sequenziale.
+
+Un esempio di implementazione è la seguente:
+
+```c
+struct q {
+     struct spinlock lock;
+     void *ptr;
+ };
+
+ void* send(struct q *q, void *p)
+ {
+    acquire(&q->lock);
+    while(q->ptr != 0)
+        ;
+    q->ptr = p;
+    wakeup(q);
+    release(&q->lock);
+ }
+
+ void* recv(struct q *q)
+ {
+  void *p;
+
+    acquire(&q->lock);
+    while((p = q->ptr) == 0)
+        sleep(q, &q->lock);
+    q->ptr = 0;
+    release(&q->lock);
+    return p;
+ }
+```
+
+Questa implementazione evita il problema del "lost wake-up" ed impedisce la generazione di un eventuale deadlock.
+
+Questo meccanismo non fa busy waiting e i metodi per utilizzarlo sono definiti in proc.c. La chiamata per eseguire la sleep deve necessariamente passare per la funzione sys_sleep contenuta nel file sysproc.c
+
+
+
+### File System
+
+Lo scopo di un file system è organizzare e archiviare i dati. I file system supportano tipicamente la condivisione di dati tra utenti e applicazioni, oltre alla persistenza in modo che i dati siano ancora disponibili dopo un riavvio.
+Il file system di xv6 fornisce file, directory e percorsi simili a Unix e archivia i suoi dati su un disco IDE per garantire la persistenza.
+
+<div id="Figure 7" align="center">
+    <figure>
+     <img src="Immagini\xv6\fslayer.jpg" width="188" height="216">
+   </figure> 
+
+Figura 7: Livelli del file system di xv6.
+</div>
+
+L'implementazione del sistema di file di xv6 è organizzata in sette livelli, come mostrato nella <A href="#Figure 7">Figura 7</A>. Il livello del disco legge e scrive blocchi su un hard disk IDE. Il livello della cache di buffer memorizza nella cache i blocchi del disco e sincronizza l'accesso ad essi, assicurando che solo un processo kernel alla volta possa modificare i dati memorizzati in un particolare blocco. Il livello di logging consente ai livelli superiori di incapsulare gli aggiornamenti a diversi blocchi in una transazione e garantisce che i blocchi vengano aggiornati atomicamente in caso di arresti anomali (cioè, tutti vengono aggiornati o nessuno). Il livello dell'inode fornisce singoli file, ognuno rappresentato come un inode (<A href="#Figure 9">Figura 9</A>)con un numero i unico e alcuni blocchi che contengono i dati del file. Il livello della directory implementa ogni directory come un tipo speciale di inode il cui contenuto è una sequenza di voci di directory, ognuna delle quali contiene il nome e il numero i di un file. Il livello del percorso fornisce nomi di percorso gerarchici come /usr/rtm/xv6/fs.c e li risolve con una ricerca ricorsiva. Il livello del descrittore di file astrae molte risorse Unix (ad esempio, pipe, dispositivi, file, ecc.) utilizzando l'interfaccia del sistema di file, semplificando la vita degli sviluppatori di applicazioni.
+
+<div id="Figure 8" align="center">
+    <figure>
+     <img src="Immagini\xv6\fslayout.jpg" width="447" height="59">
+   </figure> 
+
+Figura 8: Struttura del file system di xv6.
+</div>
+
+Il sistema di file deve avere un piano su dove archiviare gli inode e i blocchi di contenuto sul disco. Per farlo, xv6 divide il disco in diverse sezioni, come mostrato nella <A href="#Figure 8">Figura 8</A>. Il sistema di file non utilizza il blocco 0 (contiene il settore di avvio). Il blocco 1 è chiamato superblocco; contiene metadati sul sistema di file (la dimensione del sistema di file in blocchi, il numero di blocchi di dati, il numero di inode e il numero di blocchi nel log). I blocchi a partire dal 2 contengono il log. Dopo il log ci sono gli inode, con più inode per blocco. 
+
+<div id="Figure 9" align="center">
+    <figure>
+     <img src="Immagini\xv6\inode.jpg" width="368" height="322">
+   </figure> 
+
+Figura 9: inode.
+</div>
+
+Dopo quelli ci sono i blocchi della mappa bitmap che tracciano quali blocchi di dati sono in uso. I blocchi rimanenti sono blocchi di dati; ognuno è contrassegnato come libero nel blocco della mappa bitmap o contiene contenuti per un file o una directory. Il superblocco è compilato da un programma separato, chiamato mkfs, che costruisce un sistema di file iniziale.
 
 ## Confronto tra Os161 e Xv6
 
@@ -261,6 +337,11 @@ Il codice della pianificazione acquisisce e rilascia ptable.lock per mantenere l
  
     - **Xv6**: Utilizza un algoritmo di scheduling a round-robin, assegnando a ciascun processo un quantum di tempo.
     - **Os161**: Utilizza un algoritmo di scheduling simile, come round-robin o altri algoritmi in base alla configurazione.
+
+- **File System**:
+
+    - **Xv6**: Fornisce un sistema di file semplificato, ispirato a quello presente in Unix V6. Include concetti come la gestione di directory, la lettura e scrittura di file, e altre operazioni di base di un sistema di file.
+    - **Os161**: Implementa un file system simile, che supporta file, directory e percorsi simili a Unix.
 
 ### Conclusioni
 
