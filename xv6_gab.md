@@ -9,6 +9,8 @@ Questo studio si concentra principalmente sull'analisi del sistema operativo Xv6
 Così come Os161, Xv6 è un sistema operativo nato con scopi didattici, sviluppato presso il MIT, che si propone come un sistema operativo semplice e leggero, ma allo stesso tempo completo e funzionale. É basato su UNIX V6, da cui prende il nome, realizzato in C e assembly. La prima versione del 2006 è progettata per essere eseguibile su architetture x86, mentre nella versione del 2020 è stata realizzata una conversione per RISC-V. 
 La versione che abbiamo scelto di analizzare è quella del 2006 per x86.
 
+Un fatto fondamentale di xv6 è che contiene tutti i concetti fondamentali di Unix e ha una struttura simile a Unix anche se manca di alcune funzionalità che ti aspetteresti da un sistema operativo moderno. Questo è un sistema operativo leggero in cui il tempo di compilazione è molto basso e consente anche il debug remoto. 
+
 Le funzioni chiave oggetto di studio includono system calls, meccanismi di sincronizzazione, gestione della memoria virtuale e della MMU, algoritmi di scheduling, oltre a esaminare altre caratteristiche rilevanti per il corretto funzionamento di un sistema operativo. 
 
 ### Organizzazione del Kernel
@@ -45,10 +47,17 @@ Poiché Xv6 non fornisce molti servizi, il suo kernel è più piccolo di alcuni 
 #### Processi
 
 I processi vanno, in xv6, a costituire l'unità fondamentale di *isolamento*. L'astrazione del processo fornisce l'illusione a un programma che esso abbia la sua stessa macchina privata. 
-Un processo fornisce a un programma ciò che sembra essere un sistema di memoria privato, o spazio degli indirizzi, che altri processi non possono leggere o scrivere. Un processo fornisce anche al programma ciò che sembra essere la sua stessa CPU per eseguire le istruzioni del programma.
+Un processo fornisce a un programma ciò che sembra essere un **sistema di memoria privato**, o spazio degli indirizzi, che altri processi non possono leggere o scrivere. Un processo fornisce anche al programma ciò che sembra essere la sua stessa CPU per eseguire le istruzioni del programma.
 
-Xv6 utilizza le tabelle delle pagine (implementate dall'hardware) per dare a ogni processo il suo spazio degli indirizzi. La tabella delle pagine x86 mappa un indirizzo virtuale in un indirizzo fisico.
+Xv6 utilizza le *page tables* (implementate dall'hardware) per dare a ogni processo il suo spazio degli indirizzi. La tabella delle pagine x86 mappa un indirizzo virtuale in un indirizzo fisico.
 Ogni spazio degli indirizzi di un processo mappa le istruzioni e i dati del kernel, così come la memoria del programma utente. Il kernel di Xv6 mantiene molte informazioni di stato per ciascun processo, che vengono raccolte in una struttura chiamata struct proc. Gli elementi più importanti dello stato del kernel di un processo sono la sua tabella delle pagine, il suo stack del kernel e il suo stato di esecuzione.
+
+<div align="center">
+    <figure>
+     <img src="image.png" width="426" height="212">
+     <figcaption>Figura 3: Layout dello spazio degli indirizzi virtuali di un processo.</figcaption>
+    </figure>  
+</div>
 
 Un processo è definito come: *struct proc*.
  * p->state: se il processo è allocato, pronto per l'esecuzione, in esecuzione, in attesa di I/O o in uscita:
@@ -62,12 +71,6 @@ registri, program counter..) o sono utilizzati dallo sheduler del processo
 
 Quando un processo effettua una chiamata di sistema, il processore passa allo stack del kernel, aumenta il livello di privilegio hardware e inizia a eseguire le istruzioni del kernel che implementano la chiamata di sistema. Quando la chiamata di sistema si completa, il kernel torna allo spazio utente: l'hardware abbassa il livello di privilegio, passa di nuovo allo stack utente e riprende l'esecuzione delle istruzioni utente subito dopo l'istruzione di chiamata di sistema.
 
-<div align="center">
-    <figure>
-     <img src="Immagini\xv6\layout_virtual_address_space.jpg" width="426" height="212">
-     <figcaption>Figura 3: Layout dello spazio degli indirizzi virtuali di un processo.</figcaption>
-    </figure>  
-</div>
 
 ### Page Tables
 
@@ -78,13 +81,6 @@ La *page table* è una struttura dati utilizzata in xv6 (come in tutti i sistemi
 
  Xv6 utilizza anche alcune semplici astuzie con le tabelle delle pagine: mappare la stessa memoria (il kernel) in diversi spazi degli indirizzi, mappare la stessa memoria più di una volta in uno spazio degli indirizzi (ogni pagina utente è anche mappata nella vista fisica della memoria del kernel) e proteggere uno stack utente con una pagina non mappata.
  ---
-
-<div align="center">
-    <figure>
-     <img src="Immagini\xv6\pagetable.jpg"  width="624" height="624">
-     <figcaption>Figura 4: Page table di x86</figcaption>
-    </figure>  
-</div>
 
 Le istruzioni x86 (sia utente che kernel) manipolano indirizzi virtuali. La RAM della macchina, o memoria fisica, è indicizzata con indirizzi fisici.
 
@@ -108,6 +104,9 @@ Nel file `kernel/vm.c` troviamo le funzionalità relative alla  modifica della p
 - `loaduvm()`: Carica il contenuto di un file in una pagina virtuale.
 
 Il *paging* della versione x86 di xv6 collega questi due tipi di indirizzi, mappando ogni indirizzo virtuale in un indirizzo fisico.
+
+![Alt text](image-1.png)
+
 Il *paging* è diviso in due fasi: 
 1) **SEGMENTAZIONE** in cui si ottiene 'l'indirizzo lineare' partendo dall'indirizzo virtuale.
 2) **Page Table gerarchica** per la conversione da indirizzo lineare a fisico:
@@ -118,6 +117,13 @@ Ciascun PTE contiene bit di flag che indicano all'hardware di paging come è con
 * Controlli PTE_W se le istruzioni possono eseguire scritture sulla pagina; se non impostato, sono consentite solo letture e recuperi di istruzioni. 
 * PTE_U controlla se i programmi utente possono utilizzare la pagina; se deselezionato, solo al kernel è consentito utilizzare la pagina. 
 
+<div align="center">
+    <figure>
+     <img src="Immagini\xv6\pagetable.jpg"  width="624" height="624">
+     <figcaption>Figura 4: Page table di x86</figcaption>
+    </figure>  
+</div>
+
 La traduzione effettiva degl indirizzi avviene in fasi: 
 1)  Una *page table* è memorizzata in memoria fisica come un albero a due livelli. La radice dell'albero è **CR3** che contiene l'indirizzo fisico del sistema di paginazione: il primo elemento della Page Directory formata da 4096 byte e che contiene 1024 PTE per *page table*. Ogni pagina della *page table*, quindi, è un array di 1024 PTE da 32 bit. 
 2) L'hardware, che gestisce le eccezioni nel caso di mancate corrispondenze nelle tabelle di paging, utilizza i primi 10 bit di un indirizzo virtuale per selezionare un ingresso del page directory. Se, sia l'ingresso del page directory che la PTE non sono presenti, l'hardware di paginazione genera una eccezione. 
@@ -126,20 +132,19 @@ Questo approccio garantisce un controllo preciso sull'accesso alla memoria virtu
 
 ### System Call, Exceptions e Interrupts
 
-Esistono tre casi in cui il controllo deve passare da un programma utente al kernel:
-1. Una **System Call**: quando un programma utente richiede un servizio del sistema operativo. 
+Esistono tre casi in cui il controllo deve passare da un programma utente al kernel per accedere a servizi/privilegi limitati a quest'ultimo:
+1. Una **System Call**: un modo per i programmi utente di interagire con il sistema operativo. Un programma chiama una *system call* quando effettua una richiesta al kernel del sistema operativo. Vengono utilizzate per servizi hardware, per creare o eseguire processi e per comunicare con i servizi del kernel, inclusa la pianificazione di applicazioni e processi. 
 2. Un **Exception**: quando un programma compie un'azione illegale. Esempi di azioni illegali includono divisione per zero, tentativo di accedere alla memoria per una voce di tabella delle pagine che non è presente, e così via.
 3. Un **Interrupt**: quando un dispositivo genera un segnale per indicare che necessita dell'attenzione del sistema operativo. 
  
-In tutti e tre i casi, il design del sistema operativo deve predisporre quanto segue:
-1) Il sistema deve salvare i registri del processore per un futuro ripristino trasparente. 
-2) Il sistema deve essere configurato per l'esecuzione nel kernel. Il sistema deve scegliere un punto in cui far iniziare l'esecuzione del kernel.
+In tutti e tre i casi, il design del sistema operativo deve:
+1) Salvare i registri del processore per un futuro ripristino trasparente. 
+2) Essere configurato per l'esecuzione nel kernel scegliendo un punto in cui far iniziare l'esecuzione del kernel.
 3) Il kernel deve essere in grado di recuperare informazioni sull'evento, ad esempio gli argomenti della chiamata di sistema. 
-
-Tutto deve essere fatto in modo sicuro; il sistema deve mantenere l'isolamento tra i processi utente e il kernel.
+4) Tutto deve essere fatto in modo sicuro; il sistema deve mantenere l'isolamento tra i processi utente e il kernel.
 Per raggiungere questo obiettivo, il sistema operativo deve essere consapevole dei dettagli su come l'hardware gestisce le chiamate di sistema, le eccezioni e le interruzioni. Nella maggior parte dei processori, questi tre eventi sono gestiti da un unico meccanismo hardware.
 
-Ad esempio, sull'x86, un programma invoca una chiamata di sistema generando un'interruzione mediante l'istruzione *int*. Allo stesso modo, le eccezioni generano anch'esse un'interruzione. Pertanto, se il sistema operativo ha un piano per la gestione delle interruzioni, può gestire anche chiamate di sistema ed eccezioni.
+Ad esempio, sull'x86, un programma invoca una chiamata di sistema generando un'interruzione mediante l'istruzione `int`. Allo stesso modo, le eccezioni generano anch'esse un'interruzione. Pertanto, se il sistema operativo ha un piano per la gestione delle interruzioni, può gestire anche chiamate di sistema ed eccezioni.
 
 Una nota sulla terminologia: anche se il termine ufficiale x86 è eccezione, Xv6 utilizza il termine trap, principalmente perché era il termine utilizzato dal PDP11/40 ed è quindi il termine Unix convenzionale. É importante ricordare che le trap sono causate dal processo corrente in esecuzione su un processore (ad esempio, il processo effettua una chiamata di sistema e genera di conseguenza una trap), mentre le interruzioni sono causate dai dispositivi e potrebbero non essere correlate al processo in esecuzione al momento dell'interruzione.
 
@@ -160,28 +165,107 @@ L'x86 consente 256 diverse interruzioni. Le interruzioni da 0 a 31 sono definite
 
 Tvinit gestisce in modo particolare T_SYSCALL, la trap di chiamata di sistema dell'utente: specifica che il gate è di tipo 'trap' passando un valore di 1 come secondo argomento. I gate di trap non cancellano il flag IF, consentendo altre interruzioni durante l'handler della chiamata di sistema.
 
-Xv6 programma l'hardware x86 per eseguire uno switch di stack su una trap impostando un descrittore del segmento di attività attraverso il quale l'hardware carica un selettore di segmento di stack e un nuovo valore per %esp. La funzione *switchuvm* memorizza l'indirizzo della cima dello stack del kernel del processo utente nel descrittore del segmento di attività.
 
+---
+%cs: per impostare il livello di protezione (4 in totale: da 0 a 3 in ordine decrescente di privilegio)
+%eip: l'indirizzo dell'istruzione subito dopo l'istruzione int.
+%esp: punta al frame trap appena costruito
+%ss: selettore
+
+Per effettuare una chiamata di sistema sull'x86, un programma richiama l'istruzione int n, dove specifica l'indice nell'IDT. L'istruzione int esegue i seguenti passaggi:
+
+ - Recupera l'ennesimo descrittore dall'IDT, dove n è l'argomento di int.
+- Verificare che CPL in %cs sia <= DPL, dove DPL è il livello di privilegio nel descrittore.
+- Salva %esp e %ss in registri interni alla CPU, ma solo se PL < CPL del selettore del segmento target.
+- Carica %ss e %esp da un descrittore di segmento di attività.
+- Push in ordine dei registri: %ss, %esp, %flag, %cs, %eip .
+- Cancella alcuni bit di %flags.
+- Imposta %cs e %eip sui valori nel descrittore.
+
+----
 <div align="center">
     <figure>
      <img src="Immagini\xv6\intkstack.jpg" width="371" height="218">
      <figcaption>Figura 5: Stack del Kernel dopo una chiamata <i>int</i></figcaption>
     </figure>  
 </div>
+La *figura 5* mostra lo stack dopo il completamento di un'istruzione int e la modifica del livello di privilegio (il livello di privilegio nel descrittore è inferiore a CPL). Se l'istruzione int non richiedeva una modifica del livello di privilegio, x86 non salverà %ss e %esp. Dopo entrambi i casi, %eip punta all'indirizzo specificato nella tabella descrittore e l'istruzione a quell'indirizzo è la successiva istruzione da eseguire e la prima istruzione del gestore per l'int n. È compito del sistema operativo implementare questi gestori e di seguito vedremo cosa fa xv6. 
 
-Quando si verifica una trap, l'hardware del processore esegue le seguenti operazioni. Se il processore stava eseguendo in modalità utente, carica %esp e %ss dal descrittore del segmento di attività, spinge il vecchio %ss utente e %esp sul nuovo stack. Se il processore stava eseguendo in modalità kernel, nulla di quanto sopra accade. Il processore poi spinge i registri %eflags, %cs e %eip. Per alcune trap (ad esempio, un page fault), il processore spinge anche una parola di errore. Il processore carica quindi %eip e %cs dall'entry corrispondente nella IDT. Xv6 utilizza uno script Perl per generare i punti di ingresso a cui puntano le voci della IDT. Ciascuna voce spinge un codice di errore se il processore non lo ha fatto, spinge il numero di interruzione e quindi salta a *alltraps*. Alltraps salva i registri del processore in modalità utente, carica il descrittore del segmento di attività del kernel e salta a trap andando così ad eseguire il codice C del kernel.
+
+SICURO DI VOLERLO METTERE? 
+Xv6 programma l'hardware x86 per eseguire uno switch di stack su una trap impostando un descrittore del segmento di attività attraverso il quale l'hardware carica un selettore di segmento di stack e un nuovo valore per `%esp`. La funzione *switchuvm* memorizza l'indirizzo della cima dello stack del kernel del processo utente nel descrittore del segmento di attività.
+Quando si verifica una trap, l'hardware del processore esegue le seguenti operazioni. Se il processore stava eseguendo in modalità utente, carica `%esp` e `%ss` dal descrittore del segmento di attività, spinge il vecchio %ss utente e %esp sul nuovo stack. Se il processore stava eseguendo in modalità kernel, nulla di quanto sopra accade. Il processore poi spinge i registri %eflags, %cs  e %eip. Per alcune trap (ad esempio, un page fault), il processore spinge anche una parola di errore. Il processore carica quindi %eip e %cs (in cui è salvato uno dei possibili 4 livelli di protezione, numerati da 0 (maggior privilegio) a 3 (minimo privilegio))  dall'entry corrispondente nella IDT. Xv6 utilizza uno script Perl per generare i punti di ingresso a cui puntano le voci della IDT. Ciascuna voce spinge un codice di errore se il processore non lo ha fatto, spinge il numero di interruzione e quindi salta a *alltraps*. Alltraps salva i registri del processore in modalità utente, carica il descrittore del segmento di attività del kernel e salta a trap andando così ad eseguire il codice C del kernel.
 In seguito il frame di trap ripristina i registri in modalità utente e quindi iret salta di nuovo nello spazio utente.
 Nel caso di trap verificatesi durante l'esecuzione del kernel il processore non esegue lo switch di stack. 
+----
 
 #### Gestori di trap in C
 
-Trap osserva il numero di trap dell'hardware `tf->trapno` per decidere il motivo per cui è stato chiamato e cosa deve essere fatto. Se la trap è T_SYSCALL, trap chiama il gestore di chiamate di sistema syscall. Dopo aver verificato la chiamata di sistema, come secondo caso considerato trap cerca interruzioni hardware. In ultimo trap assume che l'interruzione sia stata causata da un comportamento incorretto. In questo caso, se è stata causata da un programma utente Xv6 stampa i dettagli e imposta `proc->killed` per terminare il processo. Se la trap è stata causata dal kernel, Xv6 stampa un messaggio di errore e chiama panic per terminare il kernel.
+Trap osserva il numero di trap dell'hardware `tf->trapno` per decidere il motivo per cui è stato chiamato e cosa deve essere fatto. Se la trap è T_SYSCALL, trap chiama il gestore di chiamate di sistema syscall. 
+
+Dopo aver verificato la chiamata di sistema, come secondo caso considerato trap cerca interruzioni hardware. 
+
+In ultimo trap assume che l'interruzione sia stata causata da un comportamento incorretto. In questo caso, se è stata causata da un programma utente Xv6 stampa i dettagli e imposta `proc->killed` per terminare il processo. Se la trap è stata causata dal kernel, Xv6 stampa un messaggio di errore e chiama panic per terminare il kernel.
 
 #### Codice: System Call
 
-Per le chiamate di sistema, trap invoca *syscall*. Syscall carica il numero di chiamata di sistema dal frame di trap, che contiene il valore salvato in %eax, e indice le tabelle delle chiamate di sistema. Per la prima chiamata di sistema, %eax contiene il valore SYS_exec, e syscall invocherà l'entrata SYS_exec-esima della tabella delle chiamate di sistema, corrispondente all'invocazione di sys_exec.
+Per le chiamate di sistema, trap invoca **syscall**. Syscall carica il numero di chiamata di sistema dal frame di trap, che contiene il valore salvato in %eax, e lo indicizza **system call table**. Per la prima chiamata di sistema, %eax contiene il valore *SYS_exec*, e syscall invocherà l'entrata SYS_exec-esima della tabella delle chiamate di sistema, corrispondente all'invocazione di *sys_exec*.
 
-Quando exec ritorna, restituirà il valore restituito dal gestore di chiamate di sistema (3708). Le chiamate di sistema restituiscono convenzionalmente numeri negativi per indicare errori, numeri positivi per indicare successo.
+Quando exec ritorna, restituirà il valore restituito dal gestore di chiamate di sistema. Le system call restituiscono convenzionalmente numeri negativi per indicare errori, numeri positivi per indicare successo.
+
+
+L'aggiunta di una nuova **system call** a Xv6 richiede la modifica del codice del kernel e l'aggiunta di una nuova voce alla `system call table`:
+
+1) Definire la nuova *system call* creando una nuova funzione nel codice del kernel. La funzione deve accettare gli argomenti necessari e restituire il valore richiesto. La funzione deve anche verificare la presenza di eventuali errori e restituire un codice di errore appropriato.
+
+2) Aggiungere il numero della *system call*: Scegliere un nuovo `numero di system call unico`  e aggiungerlo alla system call table nel codice del kernel. Questa tabella è tipicamente definita in `syscall.h`.
+``` C
+#define SYS_getyear 22
+```
+
+3) Aggiungere un puntatore alla chiamata di sistema nel file `syscall.c.` Questo file contiene un array di puntatori a funzioni che utilizza i numeri (indici) sopra definiti come puntatori alle *system calls* definite in posizioni diverse. Per aggiungere una *system call* personalizzata: 
+``` C
+[SYS_getyear] sys_getyear
+```
+Ciò significa che quando si verifica una chiamata di sistema con il numero 22, viene chiamata la funzione indicata dal puntatore di funzione sys_getyear. È quindi necessario implementare questa funzione. Si metterà solo il prototipo della funzione all'interno di questo file:  
+``` C
+extern int sys_getyear(void)
+```
+
+4) Aggiungere l'interfaccia a livello utente: Aggiungete un'interfaccia a livello utente alla nuova *system call*, aggiungendo una nuova voce alla libreria delle chiamate di sistema nel file `usys.S`. Questa voce deve chiamare la chiamata di sistema con gli argomenti appropriati e restituire il risultato.
+``` C
+SYSCALL(getyear)
+```
+
+5) Implementare la **system call function** in `sysproc.c`: 
+``` C
+//return the year of which
+//Unix version 6 was released
+int  sys_getyear(void) 
+{
+    return 1975;
+} 
+```
+6) Per testare il corretto funzionamento della *system call* appena implementata bisogna modificare il programma a livello utente includendo il file di intestazione che definisce la nuova chiamata di sistema e chiamando la funzione della chiamata di sistema con gli argomenti appropriati.
+``` C
+#include "types.h"
+#include "stat.h"
+#include "user.h"
+
+int main(void) 
+{
+printf(1, "Note: Unix V6 was released in year %d\n", getyear());
+    exit();
+} 
+```
+
+7) Modificare il `Makefile` aggiungendo la nuova *system call* alla lista di quelle già esistenti. Build e test.
+
+```
+make clean
+make
+```
+
 
 ### Synchronization
 
