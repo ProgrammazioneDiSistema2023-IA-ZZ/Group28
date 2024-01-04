@@ -269,33 +269,98 @@ make
 
 ### Synchronization
 
-Xv6 è progettato per eseguire su multiprocessori: computer con più CPU che eseguono operazioni in modo indipendente. Queste CPU condividono la RAM fisica e Xv6 sfrutta questa condivisione per mantenere strutture dati a cui tutte le CPU accedono in lettura e scrittura. Per evitare che le CPU si sovrappongano e corrompano le strutture dati, Xv6 utilizza meccanismi di sincronizzazione per coordinare l'accesso concorrente alle strutture dati condivise. Questi meccanismi di sincronizzazione includono semafori e lock. 
+Xv6 è progettato per funzionare su multiprocessori: computer con più CPU che eseguono operazioni in modo indipendente. Queste CPU condividono un singolo spazio di indirizzi fisici e strutture dati; Xv6 sfrutta questa condivisione per mantenere strutture dati a cui tutte le CPU accedono in lettura e scrittura. Per evitare che le CPU si sovrappongano e corrompano le strutture dati, Xv6 utilizza meccanismi di sincronizzazione per coordinare l'accesso concorrente alle strutture dati condivise. Questi meccanismi di sincronizzazione includono `semafori` e `lock`. 
 
 #### Lock
 
-Una lock fornisce l'esclusione reciproca, garantendo che solo una CPU alla volta possa detenere la lock. Se una lock è associata a ciascun elemento dati condiviso e il codice tiene sempre la lock associata quando utilizza un determinato elemento, possiamo essere certi che l'elemento viene utilizzato solo da una CPU alla volta. Xv6 molto spesso utilizza i lock per evitare le race conditions. 
+Un `lock` fornisce la **mutua esclusione**, garantendo che solo una CPU alla volta possa detenere la zona di memoria di interesse. Se il *lock* è associato a ciascun elemento dati condiviso e il codice tiene sempre il *lock* associato quando utilizza un determinato elemento, possiamo essere certi che l'elemento viene utilizzato solo da una CPU per volta. Xv6 molto spesso utilizza i lock per evitare **race conditions**. 
 
-Xv6 ha due tipi di lock: spin-lock e sleep-lock. Xv6 rappresenta uno spin-lock come una struttura chiamata struct spinlock. Il campo importante nella struttura è locked, una parola che è zero quando la lock è disponibile e diversa da zero quando è detenuta. Logicamente, Xv6 dovrebbe acquisire una lock eseguendo del codice come segue:
+Xv6 sfrutta due tipologie di lock: `spin-lock` e `sleep-lock`.
 
+### Spin Lock
+ Xv6 rappresenta uno **spin-lock** come una struttura chiamata `struct spinlock`. Il campo importante nella struttura è **lk->locked**, un dato booleano che è $0$ quando la lock è *disponibile*, $1$ quando è *detenuta*. Logicamente, Xv6 dovrebbe acquisire una lock eseguendo il codice come segue:
+
+`Spinlock.h` e `Spinlock.c`
 ```c
-void
- acquire(struct spinlock *lk)
- {
-      for(;;) {
-            if(!lk->locked) {
-                  lk->locked = 1;
-                  break;
-            }
-      }
- }
+// Mutual exclusion lock.
+struct spinlock {
+  uint locked;       // Is the lock held?
 
+  // For debugging:
+  char *name;        // Name of lock.
+  struct cpu *cpu;   // The cpu holding the lock.
+  uint pcs[10];      // The call stack (an array of program counters)
+                     // that locked the lock.
+};
+
+void
+initlock(struct spinlock *lk, char *name)
+{
+  lk->name = name;
+  lk->locked = 0;
+  lk->cpu = 0;
+}
+
+// Acquire the lock.
+// Loops (spins) until the lock is acquired.
+// Holding a lock for a long time may cause
+// other CPUs to waste time spinning to acquire it.
+void
+acquire(struct spinlock *lk)
+{
+  // Disable interrupts to avoid deadlock. Really
+  // only necessary to protect locks that may be
+  // acquired by an ISR (to avoid the deadlock
+  // that would occur if you were interrupted in
+  // a crit-sect by an ISR that wanted your held
+  // lock and couldn't release the lock
+  // until the ISR returned.) XV6 takes a
+  // conservative approach and disables interrupts
+  // when acquiring any spinlock.
+  pushcli();
+  if(holding(lk))
+    panic("acquire");
+
+  // The xchg is atomic.
+  while(xchg(&lk->locked, 1) != 0)
+    ;
+
+  // Tell the C compiler and the processor to not move loads or stores
+  // past this point, to ensure that all the stores in the critical
+  // section are visible to other cores before the lock is released.
+  // Both the C compiler and the hardware may re-order loads and
+  // stores; __sync_synchronize() introduces a guard rail for that.
+  // This ensures that lock acquire/release instructions always
+  // correctly book-end critical-section instructions.
+  __sync_synchronize();
+
+  // Record info about lock acquisition for debugging.
+  lk->cpu = cpu;
+  getcallerpcs(&lk, lk->pcs);
+}
+
+// Release the lock.
+void
+release(struct spinlock *lk)
+{
+  if(!holding(lk))
+    panic("release");
+
+  lk->pcs[0] = 0;
+  lk->cpu = 0;
+
+  __sync_synchronize();
+  ...
+
+  popcli();  // Re-enable interrupts
+}
 ```
 
-Sfortunatamente, questa implementazione non garantisce l'esclusione reciproca su un multiprocessore. Potrebbe accadere che due CPU raggiungano simultaneamente a controllare la condizione dell'if, vedano che lk->locked è zero, e quindi entrambe acquisiscano la lock eseguendo la riga successiva. A questo punto, due CPU diverse detengono la lock, violando la proprietà di esclusione reciproca. Affinchè il codice sopra sia corretto, le due righe devono essere eseguite in un passo atomico.
+Sfortunatamente, questa implementazione non garantisce la mutua esclusione su un multiprocessore. Potrebbe accadere che due CPU raggiungano simultaneamente a controllare la condizione dell'if, vedano che *lk->locked = $0$*, e quindi entrambe acquisiscano il lock eseguendo la riga successiva. A questo punto, due CPU diverse detengono il *lock* violando la proprietà di esclusione reciproca. Affinchè il codice sopra sia corretto, le due righe devono essere eseguite in un passo atomico.
 
-Per eseguire queste due righe atomicamente, Xv6 si affida a un'istruzione x86 speciale, *xchg*. In un'operazione atomica, xchg scambia una parola in memoria con il contenuto di un registro. La funzione *acquire* ripete questa istruzione xchg in un ciclo; ogni iterazione legge atomicamente lk->locked e lo imposta a 1. Se la lock è già detenuta, lk->locked sarà già 1, quindi xchg restituirà 1 e il ciclo continuerà. Tuttavia, se xchg restituisce 0, acquire ha acquisito con successo la lock: locked era 0 ed è ora 1, quindi il ciclo può fermarsi. Una volta acquisita la lock, acquire registra, per scopi di debug, la CPU e la traccia dello stack che hanno acquisito la lock. Se un processo dimentica di rilasciare una lock, queste informazioni possono aiutare a identificare il responsabile. Questi campi di debug sono protetti dalla lock e devono essere modificati solo mentre si detiene la lock.
+Per eseguire queste due righe atomicamente, Xv6 si affida a un'istruzione x86 speciale, `xchg`. In un'operazione atomica, *xchg* scambia una parola in memoria con il contenuto di un registro. La funzione `acquire` ripete questa istruzione *xchg* in un ciclo; ogni iterazione legge atomicamente *lk->locked* e lo imposta a $1$. Se il lock è già detenuta, *lk->locked* sarà già $1$, quindi *xchg* restituirà $1$ e il ciclo continuerà. Tuttavia, se *xchg* restituisce $0$, *acquire* ha acquisito con successo la lock: locked era $0$ ed è ora $1$, quindi il ciclo può fermarsi. Una volta acquisita la lock, *acquire* registra, per scopi di debug, la CPU e la traccia dello stack che hanno acquisito il lock. Se un processo dimentica di rilasciare il lock, queste informazioni possono aiutare a identificare il responsabile. *Questi campi di debug sono protetti dal lock e devono essere modificati solo mentre si detiene la lock.*
 
-La funzione release (1602) è l'opposto di acquire: cancella i campi di debug e quindi rilascia la lock. La funzione utilizza un'istruzione di assembly per cancellare locked, perché la cancellazione di questo campo dovrebbe essere atomica. Xv6 non può utilizzare una normale assegnazione in C, perché la specifica del linguaggio C non specifica che un'unica assegnazione è atomica.  L'implementazione delle spin-lock in Xv6 è specifica per x86 e quindi Xv6 non è direttamente portabile su altri processori. 
+La funzione `release` è l'opposto di *acquire*: cancella i campi di debug e quindi **rilascia il lock**. La funzione utilizza un'istruzione di assembly per cancellare locked, perché la cancellazione di questo campo dovrebbe essere atomica. Xv6 non può utilizzare una normale assegnazione in C, perché la specifica del linguaggio C non specifica che un'unica assegnazione è atomica.  L'implementazione delle spin-lock in Xv6 è specifica per x86 e quindi Xv6 non è direttamente portabile su altri processori. 
 
 <div align="center"> 
       <b>Lock in Xv6</b>
@@ -322,17 +387,68 @@ Nel momento in cui uno spin-lock viene utilizzato da un gestore di interruzioni,
 
 #### Sleep Lock
 
-Un sleep-lock è un tipo di lock che può essere rilasciato e acquisito da un thread diverso da quello che lo detiene. Un thread che tenta di acquisire un sleep-lock che è già detenuto da un altro thread viene messo in attesa. Quando il thread che detiene il sleep-lock lo rilascia, il thread in attesa lo acquisisce e riprende l'esecuzione.
+Un **sleep-lock** è un tipo di lock che può essere rilasciato e acquisito da un thread diverso da quello che lo detiene. Un thread che tenta di acquisire un *sleep-lock* che è già detenuto da un altro thread viene messo in attesa. Quando il thread che detiene il *sleep-lock* lo rilascia, il thread in attesa lo acquisisce e riprende l'esecuzione.
 
-Gli sleep-lock di Xv6 supportano il rilascio del processore durante le loro sezioni critiche. Per evitare casi di deadlock, la routine di acquisizione del blocco di attesa (chiamata *acquiresleep*) rilascia il processore in modo atomico durante l'attesa e non disabilita gli interrupt.
+A differenza dei *spin locks*, che continuano a girare in un loop, **sleep-locks* permettono a un thread di andare in stato di *sleep* (attesa) e di essere risvegliato quando il *lock* diventa disponibile, riducendo l'utilizzo della CPU e migliorando l'efficienza 
+Nel contesto di xv6, un *sleep lock* ha un campo bloccato protetto da uno spin lock. Quando un thread vuole acquisire il lock, chiama la funzione `acquiresleep`, che, in modo atomico, rilascia la CPU e rilascia lo spin lock, permettendo al thread di andare in attesa. Quando il lock è disponibile, il thread viene risvegliato.
 
-A un livello elevato, uno sleep-lock ha un campo bloccato che è protetto da un spinlock, e la chiamata a sleep di acquiresleep cede atomicamente la CPU e rilascia lo spin-lock. Il risultato è che altri thread possono eseguire mentre acquiresleep aspetta. Poiché gli sleep-lock lasciano gli interrupt abilitati, non possono essere utilizzati negli interrupt. Inoltre, dato che acquiresleep può cedere il processore, gli sleep-lock non possono essere utilizzati all'interno di sezioni critiche di spin-lock
+In `proc.c` è gestito quasi interamente le funzioni legate ai processi e ai thread, incluse le loro sincronizzazioni tramite lock. In `sleeplock.h` e `sleeplock.c` invece abbiamo l'implementazione dello *sleep lock* e delle sue funzioni:
 
-Xv6 utilizza spin-lock nella maggior parte delle situazioni, poiché hanno un basso overhead. Utilizza gli sleep-lock solo nel sistema di file, dove è conveniente poter detenere i blocchi attraverso lunghe operazioni disco.
+``` C
+// Long-term locks for processes
+struct sleeplock {
+  uint locked;       // Is the lock held?
+  struct spinlock lk; // spinlock protecting this sleep lock
 
-### Scheduling
+  // For debugging:
+  char *name;        // Name of lock.
+  int pid;           // Process holding lock
+};
 
-Ogni sistema operativo deve adottare un algoritmo di scheduling per decidere quale processo eseguire. Questo perché, anche in condizioni di muliprocessore, il numero di processi da eseguire sono maggiori del numero di processori disponibili. Xv6 utilizza un semplice algoritmo di scheduling a round-robin, che assegna a ciascun processo un intervallo di tempo fisso, chiamato quantum, durante il quale il processo può eseguire. Quando il quantum di un processo scade, Xv6 interrompe il processo e sceglie un altro processo da eseguire. É un algoritmo a priorità fissa in quanto tutti i processi hanno la stessa importanza nell'essere eseguiti.
+void
+initsleeplock(struct sleeplock *lk, char *name)
+{
+  initlock(&lk->lk, “sleep lock”);
+  lk->name = name;
+  lk->locked = 0;
+  lk->pid = 0;
+}
+
+void
+acquiresleep(struct sleeplock *lk)
+{
+  acquire(&lk->lk);
+  while (lk->locked) {
+    sleep(lk, &lk->lk);
+  }
+  lk->locked = 1;
+  lk->pid = myproc()->pid;
+  release(&lk->lk);
+}
+
+void
+releasesleep(struct sleeplock *lk)
+{
+  acquire(&lk->lk);
+  lk->locked = 0;
+  lk->pid = 0;
+  wakeup(lk);
+  release(&lk->lk);
+}
+
+
+```
+
+Gli *sleep-lock* di Xv6 supportano il rilascio del processore durante le loro sezioni critiche. Per evitare casi di deadlock, la routine di acquisizione del blocco di attesa (chiamata *acquiresleep*) rilascia il processore in modo atomico durante l'attesa e non disabilita gli interrupt.
+
+A un livello elevato, uno *sleep-lock* ha un campo bloccato che è protetto da un spinlock, e la chiamata a sleep di *acquiresleep* cede atomicamente la CPU e rilascia lo spin-lock. Il risultato è che altri thread possono eseguire mentre *acquiresleep* aspetta. Poiché gli sleep-lock lasciano gli interrupt abilitati, non possono essere utilizzati negli interrupt. Inoltre, dato che *acquiresleep* può cedere il processore, gli *sleep-lock* non possono essere utilizzati all'interno di sezioni critiche di spin-lock
+
+Xv6 utilizza spin-lock nella maggior parte delle situazioni, poiché hanno un basso overhead. 
+Utilizza gli sleep-lock solo nel sistema di file, dove è conveniente poter detenere i blocchi attraverso lunghe operazioni disco.
+
+***
+Spin-locks are best suited to short critical sections, since waiting for them wastes CPU time; sleep-locks work well for lengthy operations.
+***
 
 #### Multiplexing
 
@@ -347,19 +463,134 @@ Xv6 attua il *multiplexing* passando ciascun processore da un processo a un altr
     </figure>  
 </div>
 
-La <A href="#Figure 6">Figura 6</A> illustra i passaggi coinvolti nel passaggio da un processo utente a un altro: una transizione utente-nucleo (chiamata di sistema o interruzione) al thread kernel del vecchio processo, un cambio di contesto al thread scheduler della CPU corrente, un cambio di contesto al thread kernel di un nuovo processo e un ritorno alla trappola al processo a livello utente. Lo scheduler di xv6 ha il suo thread (registri e stack salvati) perché talvolta non è sicuro che possa eseguire su uno stack kernel di qualsiasi processo.
+La <A href="#Figure 6">Figura 6</A> illustra i passaggi coinvolti nel passaggio da un processo utente a un altro; xv6 esegue due tipi di *context-switching* a basso livello: dal thread del kernel di un processo al thread dello scheduler della CPU corrente e dal thread dello scheduler al thread del kernel di un processo. xv6 non passa mai direttamente da un processo dello spazio utente a un altro; ciò avviene tramite una transizione utente-kernel (*system call* o *interrupt*), un cambio di contesto allo scheduler, un cambio di contesto al thread del kernel di un nuovo processo e un ritorno di trap. 
 
+Lo scheduler di xv6 ha il suo thread (registri e stack salvati) perché talvolta non è sicuro che possa eseguire su uno stack kernel di qualsiasi processo.(Come visto nel paragrafo precedente)
 Il passaggio da un thread a un altro comporta il salvataggio dei registri CPU del vecchio thread e il ripristino dei registri precedentemente salvati del nuovo thread; il fatto che %esp e %eip siano salvati e ripristinati significa che la CPU cambierà gli stack e cambierà il codice che sta eseguendo.
 
-La funzione *swtch* esegue il salvataggio e il ripristino per un cambio di thread. Ogni contesto è rappresentato da un struct context*, un puntatore a una struttura memorizzata nello stack kernel coinvolto. Swtch prende due argomenti: struct context **old e struct context *new. Inserisce i registri correnti nello stack e salva il puntatore dello stack in *old. Quindi swtch copia new in %esp, estrae i registri precedentemente salvati e restituisce.
+In `swtch.S` troviamo il codice assembly per il context switching a livello kernel: 
+
+``` assembly 
+.globl swtch
+swtch:
+  movl 4(%esp), %eax
+  movl 8(%esp), %edx
+
+  # Save old callee-save registers
+  pushl %ebp
+  pushl %ebx
+  pushl %esi
+  pushl %edi
+
+  # Switch stacks
+  movl %esp, (%eax)  # Write stack pointer to *old
+  movl %edx, %esp  # Switch %esp to `new`
+
+  # Load new callee-save registers.
+  # Format is exact same as saved above,
+  # as these were saved by a previous
+  # call to `swtch`. %eip was saved
+  # implicitly as return address by the
+  # `call` instruction that invoked that
+  # previous `swtch` execution--`ret`
+  # jumps to it. So this completely
+  # encapsulates switching b/w threads
+  # of execution. Combine with `switchuvm`
+  # to switch b/w procs.
+
+  popl %edi
+  popl %esi
+  popl %ebx
+  popl %ebp
+  ret
+```
+
+Per semplicità possiamo vedere quanto scritto in assembly anche scritto in C per un eventuale studio del comportamento:
+``` c
+struct context {
+    uint edi;
+    uint esi;
+    uint ebx;
+    uint ebp;
+    uint eip;
+};
+
+void swtch(struct context **old, struct context *new);
+```
+La funzione *swtch* esegue il salvataggio e il ripristino per un cambio di thread.
+Ogni contesto è rappresentato da un struct context*, un puntatore a una struttura memorizzata nello stack kernel coinvolto. Swtch prende due argomenti: struct context **old e struct context *new. Inserisce i registri correnti nello stack e salva il puntatore dello stack in *old. Quindi swtch copia new in %esp, estrae i registri precedentemente salvati e restituisce.
+
+
 
 #### Scheduling
+VALUTARE come fonderlo a quello che ho scritto io prima
+
 
 Un processo che desidera cedere la CPU deve acquisire il lock della tabella dei processi **ptable.lock**, rilasciare eventuali altri lock che sta tenendo, aggiornare il proprio stato (*proc->state*) e quindi chiamare *sched*. Quest'ultimo verifica le condizioni necessarie, tra cui l'assenza di altri lock e la disabilitazione degli interrupt, e quindi chiama *swtch* per passare al contesto dello scheduler. Lì, avviene la selezione di un nuovo processo eseguibile, seguito da un nuovo passaggio di contesto attraverso swtch, che porta l'esecuzione al nuovo processo.
 
 Una caratteristica unica è l'uso di ptable.lock attraverso le chiamate a swtch, anche se questo va contro la convenzione di rilasciare il lock nel thread che l'ha acquisito. Tuttavia, questo approccio è necessario per proteggere invarianti critiche sui campi di stato e contesto del processo durante swtch.
 
 Il codice della pianificazione acquisisce e rilascia ptable.lock per mantenere la coerenza degli stati dei processi. Inoltre, la sua struttura è progettata per far rispettare invarianti cruciali su ciascun processo. L'acquisizione e il rilascio del lock avvengono in thread diversi per garantire che gli invarianti siano rispettati durante le transizioni di stato.
+
+### Scheduling
+L'ultima sezione ha esaminato i dettagli di basso livello di swtch; ora prendiamo swtch come dato ed esaminiamo le convenzioni coinvolte nel passaggio dal processo allo scheduler e di nuovo al processo.
+
+Ogni sistema operativo deve adottare un **algoritmo di scheduling** per decidere quale processo eseguire. Questo perché, anche in condizioni di muliprocessore, il numero di processi da eseguire sono maggiori del numero di processori disponibili. Xv6 utilizza un semplice algoritmo di scheduling denominato `round-robin` basato sul *time-sharing*. Le sue caratteristiche principali includono:
+
+- *Rotazione dei Processi*: I processi vengono eseguiti in cicli circolari, assegnando a ciascun processo un intervallo di tempo noto come **quantum** o **time slice**.
+- *FIFO*: I processi vengono accodati in una coda e vengono eseguiti in ordine di arrivo. Quando un processo termina il suo quantum, viene messo in fondo alla coda, consentendo agli altri processi di essere eseguiti. É un algoritmo a *priorità fissa* in quanto tutti i processi hanno la stessa importanza nell'essere eseguiti.
+- Nessun processo rimane in esecuzione indefinitamente.
+- *Implementazione Semplice*.
+- *Overhead di Cambio di Contesto*: Può generare un overhead di cambio di contesto, specialmente con processi che richiedono frequenti switch.
+
+Una volta che il kernel ha finito di configurarsi ( *swtch.S* ), inizializzare tutti i dispositivi e i driver, ecc, in `proc.c` l'ultima funzione che `main()` chiama è `scheduler()`. Gli interrupt sono stati disabilitati nel boot loader e non sono stati ancora abilitati, quindi è anche compito dello scheduler abilitarli per la prima volta in xv6.
+
+*scheduler()* non ritorna mai; è un ciclo infinito che continua a cercare un processo nella tabella dei processi con stato **RUNNABLE**, quindi lo esegue. Da quel momento in poi, ad eccezione degli interrupt e delle chiamate di sistema, il kernel farà sempre e solo una cosa: pianificare l'esecuzione dei processi.
+
+``` c
+void scheduler(void)
+{
+  struct proc *p;
+
+  for(;;){
+    // Enable interrupts on this processor. This, (and
+    // the release() call below) is important for when
+    // the CPU is idle (can find no RUNNABLE proc) and
+    // loops continuously. If it held the lock and looped,
+    // no other CPU can do any proc-related work, such
+    // as marking a proc RUNNABLE so as to de-idle this
+    // CPU. Further, procs may be waiting for I/O, in
+    // which case interrupts had better be on.
+    sti();
+
+    // Loop over process table looking for process to run.
+    acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+
+      // Switch to chosen process. Important: It is
+      // the process's job to release ptable.lock
+      // and then reacquire it before jumping back to us.
+      proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+      swtch(&cpu->scheduler, p->context);
+      // sched()'s `swtch` usually enters here
+      switchkvm();
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      proc = 0;
+    }
+    release(&ptable.lock);
+  }
+}
+
+```
+
+# Note per Mr. Noonzio:
+dovremmo rivedere l'ordine con cui trattiamo gli argomenti in modo che abbiano una consequenzialità 
 
 ## Confronto tra Os161 e Xv6
 
