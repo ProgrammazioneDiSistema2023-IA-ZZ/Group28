@@ -47,7 +47,7 @@ Xv6 è implementato come un kernel monolitico, seguendo la maggior parte dei sis
 
 I processi vanno in xv6 a costituire l'unità fondamentale di isolamento. L'astrazione del processo fornisce l'illusione a un programma che esso abbia la sua stessa macchina privata. Un processo fornisce a un programma ciò che sembra essere un sistema di memoria privato, o spazio degli indirizzi, che altri processi non possono leggere o scrivere. Un processo fornisce anche al programma ciò che sembra essere la sua stessa CPU per eseguire le istruzioni del programma.
 
-Xv6 utilizza le tabelle delle pagine (implementate dall'hardware) per dare a ogni processo il suo spazio degli indirizzi. La tabella delle pagine x86 mappa un indirizzo virtuale in un indirizzo fisico.
+Xv6 utilizza le page tables (implementate dall'hardware) per dare a ogni processo il suo spazio degli indirizzi. La tabella delle pagine x86 mappa un indirizzo virtuale in un indirizzo fisico.
 Ogni spazio degli indirizzi di un processo mappa le istruzioni e i dati del kernel, così come la memoria del programma utente. Il kernel di Xv6 mantiene molte informazioni di stato per ciascun processo, che vengono raccolte in una struttura chiamata struct proc. Gli elementi più importanti dello stato del kernel di un processo sono la sua tabella delle pagine, il suo stack del kernel e il suo stato di esecuzione.
 
 Quando un processo effettua una chiamata di sistema, il processore passa allo stack del kernel, aumenta il livello di privilegio hardware e inizia a eseguire le istruzioni del kernel che implementano la chiamata di sistema. Quando la chiamata di sistema si completa, il kernel torna allo spazio utente: l'hardware abbassa il livello di privilegio, passa di nuovo allo stack utente e riprende l'esecuzione delle istruzioni utente subito dopo l'istruzione di chiamata di sistema.
@@ -62,7 +62,7 @@ Figura 3: Layout dello spazio degli indirizzi virtuali di un processo.
 
 ### Page Tables
 
-Le tabelle delle pagine sono il meccanismo attraverso il quale il sistema operativo controlla il significato degli indirizzi di memoria. Consentono a Xv6 di multiplexare gli spazi degli indirizzi di processi diversi su una singola memoria fisica e di proteggere le memorie di processi diversi. Xv6 utilizza principalmente le tabelle delle pagine per multiplexare gli spazi degli indirizzi e proteggere la memoria. Utilizza anche alcune semplici astuzie con le tabelle delle pagine: mappare la stessa memoria (il kernel) in diversi spazi degli indirizzi, mappare la stessa memoria più di una volta in uno spazio degli indirizzi (ogni pagina utente è anche mappata nella vista fisica della memoria del kernel) e proteggere uno stack utente con una pagina non mappata.
+Le page tables sono il meccanismo attraverso il quale il sistema operativo controlla il significato degli indirizzi di memoria. Consentono a Xv6 di multiplexare gli spazi degli indirizzi di processi diversi su una singola memoria fisica e di proteggere le memorie di processi diversi. Xv6 utilizza principalmente le page tables per multiplexare gli spazi degli indirizzi e proteggere la memoria. Utilizza anche alcune semplici astuzie con le page tables: mappare la stessa memoria (il kernel) in diversi spazi degli indirizzi, mappare la stessa memoria più di una volta in uno spazio degli indirizzi (ogni pagina utente è anche mappata nella vista fisica della memoria del kernel) e proteggere uno stack utente con una pagina non mappata.
 
 <div align="center">
     <figure>
@@ -72,7 +72,7 @@ Le tabelle delle pagine sono il meccanismo attraverso il quale il sistema operat
 Figura 4: Page table di x86
 </div>
 
-Le istruzioni x86 (sia utente che kernel) manipolano indirizzi virtuali. La RAM della macchina, o memoria fisica, è indicizzata con indirizzi fisici. L'hardware di paginazione x86 collega questi due tipi di indirizzi, mappando ogni indirizzo virtuale in un indirizzo fisico. Una tabella delle pagine x86 è logicamente un array di 2^20 (1.048.576) page table entries (PTEs). Ogni PTE contiene un numero di physical page number (PPN) di 20 bit e alcune bandiere. L'hardware di paginazione traduce un indirizzo virtuale utilizzando i suoi primi 20 bit per indicizzare la tabella delle pagine e trovare una PTE, sostituendo i primi 20 bit dell'indirizzo con il PPN nella PTE.
+Le istruzioni x86 (sia utente che kernel) manipolano indirizzi virtuali. La RAM della macchina, o memoria fisica, è indicizzata con indirizzi fisici. L'hardware di paginazione x86 collega questi due tipi di indirizzi, mappando ogni indirizzo virtuale in un indirizzo fisico. Una tabella delle pagine x86 è logicamente un array di 2^20 (1.048.576) page table entries (PTEs). Ogni PTE contiene un numero di physical page number (PPN) di 20 bit e alcuni flags. L'hardware di paginazione traduce un indirizzo virtuale utilizzando i suoi primi 20 bit per indicizzare la tabella delle pagine e trovare una PTE, sostituendo i primi 20 bit dell'indirizzo con il PPN nella PTE.
 
 La traduzione effettiva avviene in due fasi. Una tabella delle pagine è memorizzata in memoria fisica come un albero a due livelli. La radice dell'albero è un page directory di 4096 byte che contiene 1024 riferimenti simili a PTE a pagine di tabella delle pagine. Ogni pagina di tabella delle pagine è un array di 1024 PTE da 32 bit. L'hardware di paginazione utilizza i primi 10 bit di un indirizzo virtuale per selezionare un ingresso del page directory. Se sia l'ingresso del page directory che la PTE non sono presenti, l'hardware di paginazione genera una eccezione. 
 
@@ -123,7 +123,7 @@ Trap osserva il numero di trap dell'hardware tf->trapno per decidere il motivo p
 
 Per le chiamate di sistema, trap invoca *syscall*. Syscall carica il numero di chiamata di sistema dal frame di trap, che contiene il valore salvato in %eax, e indice le tabelle delle chiamate di sistema. Per la prima chiamata di sistema, %eax contiene il valore SYS_exec, e syscall invocherà l'entrata SYS_exec-esima della tabella delle chiamate di sistema, corrispondente all'invocazione di sys_exec.
 
-Quando exec ritorna, restituirà il valore restituito dal gestore di chiamate di sistema (3708). Le chiamate di sistema restituiscono convenzionalmente numeri negativi per indicare errori, numeri positivi per indicare successo.
+Quando exec ritorna, restituirà il valore restituito dal gestore di chiamate di sistema. Le chiamate di sistema restituiscono convenzionalmente numeri negativi per indicare errori, numeri positivi per indicare successo.
 
 ### Synchronization
 
@@ -153,7 +153,7 @@ Sfortunatamente, questa implementazione non garantisce l'esclusione reciproca su
 
 Per eseguire queste due righe atomicamente, Xv6 si affida a un'istruzione x86 speciale, *xchg*. In un'operazione atomica, xchg scambia una parola in memoria con il contenuto di un registro. La funzione *acquire* ripete questa istruzione xchg in un ciclo; ogni iterazione legge atomicamente lk->locked e lo imposta a 1. Se la lock è già detenuta, lk->locked sarà già 1, quindi xchg restituirà 1 e il ciclo continuerà. Tuttavia, se xchg restituisce 0, acquire ha acquisito con successo la lock: locked era 0 ed è ora 1, quindi il ciclo può fermarsi. Una volta acquisita la lock, acquire registra, per scopi di debug, la CPU e la traccia dello stack che hanno acquisito la lock. Se un processo dimentica di rilasciare una lock, queste informazioni possono aiutare a identificare il responsabile. Questi campi di debug sono protetti dalla lock e devono essere modificati solo mentre si detiene la lock.
 
-La funzione release (1602) è l'opposto di acquire: cancella i campi di debug e quindi rilascia la lock. La funzione utilizza un'istruzione di assembly per cancellare locked, perché la cancellazione di questo campo dovrebbe essere atomica. Xv6 non può utilizzare una normale assegnazione in C, perché la specifica del linguaggio C non specifica che un'unica assegnazione è atomica.  L'implementazione delle spin-lock in Xv6 è specifica per x86 e quindi Xv6 non è direttamente portabile su altri processori. 
+La funzione release è l'opposto di acquire: cancella i campi di debug e quindi rilascia la lock. La funzione utilizza un'istruzione di assembly per cancellare locked, perché la cancellazione di questo campo dovrebbe essere atomica. Xv6 non può utilizzare una normale assegnazione in C, perché la specifica del linguaggio C non specifica che un'unica assegnazione è atomica.  L'implementazione delle spin-lock in Xv6 è specifica per x86 e quindi Xv6 non è direttamente portabile su altri processori. 
 
 <div align="center"> 
       <b>Lock in Xv6</b>
@@ -315,8 +315,8 @@ Dopo quelli ci sono i blocchi della mappa bitmap che tracciano quali blocchi di 
 
 - **Gestione della Memoria**:
   
-    - **Xv6**: Implementa un sistema di gestione della memoria basato su paging. Le tabelle delle pagine consentono il controllo degli indirizzi di memoria, permettendo a Xv6 di multiplexare gli spazi degli indirizzi di processi diversi su una singola memoria fisica e proteggere le memorie di processi diversi.
-    - **Os161**: Anche Os161 utilizza tabelle delle pagine e presenta concetti di gestione della memoria simili.
+    - **Xv6**: Implementa un sistema di gestione della memoria basato su paging. Le page tables consentono il controllo degli indirizzi di memoria, permettendo a Xv6 di multiplexare gli spazi degli indirizzi di processi diversi su una singola memoria fisica e proteggere le memorie di processi diversi.
+    - **Os161**: Anche Os161 utilizza page tables e presenta concetti di gestione della memoria simili.
 
 - **Gestione dei Processi**:
      

@@ -89,7 +89,7 @@ La pagina virtuale è divisa in due livelli:
 - **Livello 0 (PGTBL0)**: contiene una tabella di 512 voci che puntano a pagine virtuali di livello 1
 - **Livello 1 (PGDIR)**: contiene una tabella di 512 voci che puntano a pagine fisiche. Ogni voce ha due campi dati: uno per l'indirizzo fisico della pagina e uno per i bit di accesso alla memoria.
 
-In xv6 le pagine vengono mappate con la seguente regola: l'indirizzo virtuae ha dimensione 32 bit ed è calcolato: `VA = PGSIZE * PTE_ADDR + offset`. 
+In xv6 le pagine vengono mappate con la seguente regola: l'indirizzo virtuale ha dimensione 32 bit ed è calcolato: `VA = PGSIZE * PTE_ADDR + offset`. 
 Dove `PTE_ADDR` è l’indice nella tabella di livello 1 e `offset` è l’offset all’interno della pagina.
 Una pagina virtuale può essere mappata in più pagine fisiche, cioè una stessa pagina virtuale può avere diverse pagine fisiche associate ad essa. Questo avviene quando si esegue un programma compilato con l'opzione `-pg`, ovvero con
 le funzioni di profilatura attiva. In questo caso il kernel crea una copia "shadow" delle pagine del processo e le mappa in modo diverso. Le pagine shadow non sono visibili al processo, ma possono essere utilizzate dal debugger per analizzare il codice sorgente.
