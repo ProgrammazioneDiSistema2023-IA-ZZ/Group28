@@ -602,37 +602,277 @@ dovremmo rivedere l'ordine con cui trattiamo gli argomenti in modo che abbiano u
 - **Architettura di Destinazione**:
 
     - **Xv6**: Inizialmente progettato per l'architettura x86. Successivamente, è stata sviluppata una versione per RISC-V.
-    - **Os161**: Supporta diverse architetture, inclusi MIPS, ARM e Intel.
+    - **Os161**: Supporta diverse architetture, inclusi MIPS, ARM e Intel. Esistono due rami supportati di OS/161: il ramo 1.x, lanciato per la prima volta nel 2001, fornisce un ambiente di programmazione del kernel monoprocessore; e il ramo 2.x, che ha debuttato nel 2009 ed è stato finalmente rilasciato completamente nel 2015, entra nell'era multicore aggiungendo il supporto multiprocessore e altri attributi più moderni. Entrambi questi rami sono mantenuti attivamente
 
 - **Organizzazione del Kernel**:
             
     - **Xv6**: É un kernel monolitico, il che significa che l'intero sistema operativo opera in modalità kernel. Questo design semplifica la cooperazione tra diverse parti del sistema.
-    - **Os161**: Utilizza un'organizzazione a microkernel, dove solo le funzioni essenziali risiedono nel kernel, mentre i servizi aggiuntivi sono implementati come server a livello utente.
+    - **Os161**: Os161 è basato su un'architettura a microkernel, il che significa che il kernel è **modulare**(diverse funzionalità sono suddivise in moduli separati. Questi moduli possono essere sviluppati, testati e sostituiti in modo indipendente) e divide le funzionalità del sistema operativo in componenti distinti. Questi componenti possono comunicare tra loro attraverso meccanismi di messaggistica.
 
+      La _memoria_ nel kernel di 0s161 è solitamente suddivisa in tre parti principali:
+
+      1) *Kernel Text*: Questa è l'area di memoria in cui risiede il codice eseguibile del kernel. Contiene le istruzioni necessarie per eseguire le operazioni di base del sistema operativo.
+
+      2) *Kernel Data*: Questa area memorizza le variabili globali e i dati utilizzati dal kernel. Include strutture dati come tabelle di processo, informazioni sulla gestione della memoria e altre variabili di stato del kernel.
+
+      3) *Heap e Stack Kernel*: Queste aree sono utilizzate per la gestione dinamica della memoria all'interno del kernel. Lo heap viene utilizzato per l'allocazione dinamica di strutture dati, mentre lo stack gestisce le chiamate alle funzioni e le variabili locali.
+
+    ---
+**lo mettiamo? prima non ne abbiamo parlato**
 - **Gestione della Memoria**:
   
     - **Xv6**: Implementa un sistema di gestione della memoria basato su paging. Le tabelle delle pagine consentono il controllo degli indirizzi di memoria, permettendo a Xv6 di multiplexare gli spazi degli indirizzi di processi diversi su una singola memoria fisica e proteggere le memorie di processi diversi.
     - **Os161**: Anche Os161 utilizza tabelle delle pagine e presenta concetti di gestione della memoria simili.
-
+---
 - **Gestione dei Processi**:
      
     - **Xv6**: I processi costituiscono l'unità fondamentale di isolamento. Ogni processo ha il proprio spazio degli indirizzi virtuale.
     - **Os161**: Utilizza una struttura di processo simile, ma l'implementazione può variare a seconda dell'architettura di destinazione.macchina privata con memoria e CPU dedicate.
+    Di solito è necessario che l'intero processo debba essere interamente in memoria prima della sua esecuzione, in Os161 la *virtual memory* permette che il processo sia solo parzialmente in memoria. Le istruzioni invece devono essere in memoria fisica. 
+
+    La *virtual memory* è la separazione tra *userl logical memory* dalla *memoria fisica*. Solo la parte di programma da eseguire deve essere in memoria e lo spazio degli indirizzi logici puo' anche essere più grande dello spazio degli indirizzi fisici. Questo permette a più programmi di funzionare contemporaneamente, maggiori performance e velocità.
+    Può essere implementata tramite *demand paging* oppure *demand segmentation*
+
+    Lo *spazio di indirizzamento virtuale* fa riferimento alla vista logica di come i processi sono salvati in memoria: partono dall'indirizzo 0 e con indirizzi contigui fino a fine spazio:
+
+    <div align="center">
+    <figure>
+     <img src="virtualmemory.jpg" width="371" height="500">
+     <figcaption>Figura 7: Stack del Kernel dopo una chiamata</figcaption>
+    </figure>  
+    </div>
+
+
+    Nel kernel OS/161, i processi sono organizzati attraverso una struttura dati denominata **coda di esecuzione dei processi**. La coda è implementata come una lista doppiamente concatenata, e il suo header si trova nel file `kern/include/threadlist.h`. Questa lista contiene i processi attualmente in esecuzione sul sistema.
+    ``` C
+    struct threadlistnode {
+      struct threadlistnode *tln_prev;
+      struct threadlistnode *tln_next;
+      struct thread *tln_self;
+    };
+
+    struct threadlist {
+      struct threadlistnode tl_head;
+      struct threadlistnode tl_tail;
+      unsigned tl_count;
+    };
+    ```
+
+    Ogni CPU ha la sua coda di esecuzione dei processi, e la lista contiene le informazioni essenziali sui processi in esecuzione, come il **PID** (Process ID) e altre proprietà associate al processo. L'utilizzo di una lista doppiamente concatenata consente un accesso efficiente e una gestione flessibile dei processi.
+
+    In OS161 esiste una struttura dati chiamata `Process Table`. Questa tabella dei processi mappa un PID (Process ID) ad una struttura dati associata a un processo. Il suo scopo principale è tenere traccia dei processi in esecuzione nel sistema. Ogni processo ha un PID univoco assegnato dalla tabella.
+
+    La struttura del processo in Os161 è descritta in `process.h` e tutte le funzioni annesse sono sviluppate in `process.c`:
+
+    ``` c
+    /* Process Structure */
+    struct process {
+      char *p_name;
+      pid_t p_id;
+
+      /* Internal Stuff */
+      struct processlistnode p_listnode; /* Link for run/sleep/zombie lists */
+
+      /*For waitpid()*/
+      struct semaphore *p_waitsem;
+      // struct cv *p_waitcv;
+      // struct lock *p_waitlock;
+      //struct processlist p_waiters;
+
+      pid_t p_parentpid;
+      //struct processlist p_children;
+      struct thread *p_thread;
+
+      /* For fork() */
+      // struct semaphore *p_forksem;
+
+      // Array of file handle pointers; initialize to NULL pointers on process creation.
+      struct file_handle* p_fd_table[FD_MAX];
+    };
+
+    /* States a process can be in. */
+    typedef enum {
+      P_FREE,		/* available (no process) */
+      P_USED,		/* unavalable (process running) */
+      P_ZOMBIE,	/* zombie (process exited) */
+      P_INVALID	/* Invalid PID */
+    } pidstate_t;
+
+    struct process *init_process_create(const char*);
+
+    int process_create(const char*, pid_t parent, struct process**);
+    void process_exit(pid_t pid, int exitcode);
+    void process_destroy(pid_t pid);
+    int process_wait(pid_t pidToWait, pid_t pidToWaitFor);
+    /* Call once during system startup to allocate data structures */
+    void processtable_bootstrap(void);
+    void processtable_biglock_acquire(void);
+    void processtable_biglock_release(void);
+    bool processtable_biglock_do_i_hold(void);
+    int allocate_pid(pid_t* allocated_pid);
+    void release_pid(int);
+    struct process* get_process(pid_t);
+    pidstate_t get_pid_state(pid_t);
+    pid_t get_process_parent(pid_t);
+    int get_free_file_descriptor(pid_t);				// Given a process id, returns a file descriptor that is free.
+    void release_file_descriptor(pid_t, int fd);		// Closing file, so release fd
+    struct file_handle* get_file_handle(pid_t, int fd);	// Given a file descriptor, returns the pointer to the associated file handle.
+    int get_process_exitcode(pid_t);
+    void set_process_parent(pid_t,pid_t);
+    void abandon_children(pid_t);
+    void collect_children(void);
+    void process_cleanup(void);
+    ```
+
+    Inoltre vi è una seconda struttura chiamata `processlist` che è parte dell'implementazione del kernel e si occupa di gestire la lista dei processi in esecuzione nel sistema operativo. Essa è essenziale per tenere traccia di tutti i processi attivi, ciascuno identificato da un PID (Process ID). La struttura dati associata a questa lista contiene informazioni cruciali su ogni processo, consentendo al kernel di monitorare e gestire correttamente l'esecuzione dei processi.
 
 - **System Call, Exceptions e Interrupts**:
  
     - **Xv6**: Gestisce system call, eccezioni e interrupts attraverso un meccanismo comune. Le interfacce di sistema sono implementate tramite trap (o interrupt), e il kernel decide come gestire l'evento in base al numero di trap.
     - **Os161**: Simile a xv6, gestisce system calls, interrupts ed exceptions in modo da facilitare l'esecuzione del sistema operativo.
 
+    In OS/161, le *system call* vengono gestite in modalità kernel. Quando un'applicazione utente esegue una system call, il controllo passa al kernel. Quando avviene un **trap** (o un **interrupt**) per la chiamata di una *system call*, OS/161 (come xv6) passa dalla modalità utente alla modalità kernel, nota anche come "modalità privilegiata". Questo è reso possibile grazie alle istruzioni specifiche delle architetture dei processori moderni.
+    Quando il kernel gestisce una *system call*, salva il contesto dell'applicazione utente (registri, puntatori di stack, ecc.), esegue il codice della *system call* e poi ripristina il contesto dell'applicazione utente prima di restituire il controllo all'applicazione.
+    
+    Os161 supporta una gamma più ampia di system call che riflettono meglio le funzionalità di un sistema operativo completo. Include operazioni di gestione dei processi, gestione dei file, comunicazione tra processi, sincronizzazione e altro.
+    - *Astrazione e modularità*: OS161 promuove una maggiore astrazione e modularità rispetto a xv6. Le system call sono implementate come chiamate remote attraverso messaggi, il che consente una maggiore separazione tra il codice utente e il codice kernel.
+    - *Isolamento e protezione*: Grazie alla separazione dei servizi e dei componenti nel microkernel di OS161, è più probabile che il sistema operativo offra un maggiore isolamento e protezione tra le diverse componenti. Questo è vantaggioso in termini di sicurezza e stabilità
+
+    In Os161 le  _system call_ sono gestite in questo modo:
+
+    - **Interruzioni (Trappole)**: Quando un'applicazione utente richiede un servizio del kernel attraverso una chiamata di sistema, il controllo passa dalla modalità utente alla modalità kernel. Questo passaggio avviene attraverso una trappola o un'interruzione. 
+    - **Interrupt Handler del Kernel**: Una volta che l'interruzione o la trappola viene generata, il controllo passa all'interrupt handler del kernel: una porzione di codice del kernel che gestisce gli eventi generati dalle interruzioni e dalle trappole.
+    - **Gestione delle Chiamate di Sistema**: Il kernel di OS/161 ha una tabella delle chiamate di sistema (_system call table_) che associa i numeri delle chiamate di sistema alle funzioni del kernel corrispondenti. Ad esempio, il numero 0 potrebbe essere associato a una chiamata di sistema per terminare un processo, il numero 1 per scrivere su un file, il numero 2 per leggere da un file, e così via.
+
+    Esempio di definizione di una tabella delle chiamate di sistema in OS/161:
+
+    ```c
+    // Definizione della tabella delle chiamate di sistema in OS/161
+    typedef int (*syscall_function_t)(void);
+    syscall_function_t syscall_table[SYSCALL_COUNT];
+    ```
+
+    - **Esecuzione delle Chiamate di Sistema**: Una volta individuata la chiamata di sistema richiesta e associata alla sua funzione corrispondente, il kernel esegue il codice della funzione di chiamata di sistema.
+    - **Restituzione dei Risultati**: Dopo l'esecuzione della chiamata di sistema, il controllo ritorna all'applicazione utente, e il risultato della chiamata di sistema (ad esempio, il valore restituito da una funzione di lettura/scrittura) può essere restituito all'applicazione.
+    - **Ripristino del Contesto**: Durante il passaggio dalla modalità utente alla modalità kernel, e viceversa, il kernel salva e ripristina il contesto del processo corrente, compresi i registri, lo stack e altre informazioni importanti. Questo è necessario per garantire che l'esecuzione possa riprendere correttamente dopo una chiamata di sistema.
+
+    Ogni numero di chiamata di sistema è associato a una funzione specifica nel kernel. Ecco un esempio semplificato di come potrebbe apparire la definizione e l'inizializzazione della tabella delle chiamate di sistema in OS/161:
+
+    ```c
+    // Definizione delle chiamate di sistema in OS/161
+    #define SYS_HALT 0
+    #define SYS_READ 2
+    // ... altre chiamate di sistema ...
+    // Inizializzazione della tabella delle chiamate di sistema
+    syscall_table[SYS_HALT] = sys_halt;
+    syscall_table[SYS_READ] = sys_read;
+    // ... inizializzazione di altre chiamate di sistema ...
+    ```
+    Una volta che una chiamata di sistema è stata richiesta dall'applicazione utente, il kernel esegue la funzione associata all'interno della tabella delle chiamate di sistema.
+    
+    ```c
+    int sys_read(int filehandle, char *buf, size_t size) {
+        // Implementazione della lettura dal filehandle nel buffer
+        // Restituzione del numero di byte letti o di un valore di errore }
+    ```
+
 - **Sincronizzazione**:
  
     - **Xv6**: Utilizza spin-lock e sleep-lock per garantire l'accesso esclusivo alle risorse condivise tra i processi. Gli spin-lock sono utilizzati in sezioni critiche di breve durata, mentre gli sleep-lock supportano il rilascio temporaneo del processore.
-    - **Os161**: Implementa meccanismi di sincronizzazione simili, come semafori e lock.
+    - **Os161**: Nella versione più aggiornata vi è la possibilità di lavorare su dispositivi multiprocessori, quindi la gestione e l'accesso alle *sezioni critiche* è fondamentale. In *Os161* vengono riproposti i `mutex lock` per proteggere le *sezioni critiche* e evitare *race conditions*: 
+      1) Un processo acquisisce il *lock* prima di entrare nella *sezione critica* usando la funzione `acquire()`
+      2) Rilascia il *lock* quando esce dalla sezione di interesse del codice grazie alla funzione `release()`
+      ``` 
+      while (true){
+        #acquire lock
+        critical section 
+        release lock
+        remainder section
+      }
+      ```
+      In Os161 troviamo un lock in particolare: `Spinlock` (*kern/thread/spinlock.c*):
+      ``` c
+      ...
+      while (1) {
+        if (spinlock_data_get(&splk -> splk_lock) != 0)
+          continue;   # verifica che il lock non sia già stato acquisito da un altro thread - 0: da acquisire / 1: acquisito
+        if (spinlock_data_testandset(&splk -> splk_lock) != 0)
+          continue;  # acquisisce il lock 
+        break;
+      }
+      /*La funzione `spinlock_data_testandset()` è una funzione atomica che imposta la variabile su 1 solo se era 0, al tramonto dell'istruzione restituisce il valore precedente. Se non era 0, l'istruzione viene ripetuta.*/
+      ...
+      ```
+      *Os161* però utilizza altre tecniche di sincronizzazione più sofisticate; tra queste ci sono i `semafori`. Un semaforo **S** è un valore intero che permette l'accesso a due operazioni **atomiche**: `signal` e `wait()`
+
+      ```
+      wait(S) {
+        while(S<=0); 
+        //busy wait
+        S--;
+      } 
+      Decrementa il contatore. Se il contatore diventa negativo, il processo o thread viene messo in attesa.
+
+      signal(S){
+        S++;
+      }
+      Incrementa il contatore. Se ci sono processi o thread in attesa, uno di essi viene risvegliato.
+      ```
+      In Os161 il codice relativo ai semafori: creazione,gestione ecc può essere letto in `kern/thread/synch.c` e `kern/thread/synch.h`
+      ``` c
+        struct semaphore{
+          int count;
+          char *name;
+        };
+      ```
+      A differenza di *xv6*, in Os161 i processi hanno un campo extra che ne definisce la `priorità`. In ambito di sincronizzazione è un fattore di cui tener conto: si disabilitano gli *interrupts* del timer prima dell'ingresso nella *sezione critica* e si riabilitano all'uscita. Questa tecnica si basa sul fattocceh i thread con priorità più bassa **non possono interrompere** l'esecuzione di un thread con priorità superiore. In altre parole, i thread con priorità superiore devono attendere che un thread con priorità superiore abbandoni la *sezione critica* prima di poter essere eseguiti.
+      Una semplice interfaccia per la gestione dell'interrupt è nel file: `kern/arch/mips/include/spl.h`.
+
+      *Os161* usa anche i `lock`: 
+      ``` c
+      struct lock *mylock = lock create("LockName");
+      lock_aquire(mylock);
+        // critical section 
+      lock_release(mylock);
+      ```
+      I lock sono molto simili a dei *semafori binari* conun valore iniziale $S = 1$ ma con un ulteriore imposizione: *il thread che rilascia il lock deve essere lo stesso che lo ha acquisito*
+
+      Vi sono altre tecniche che permettono di ottimizzare la sincronizzazione di thread e/o processi, tra queste vi sono le `condition variables` che permettono ai thread di sospendersi quando non sono in grado di procedere a causa di una condizione specifica. Questa *variabile* funge da meccanismo di notifica, consentendo ad altri thread di segnalare al thread in attesa che la condizione desiderata è stat soddisfatta. Solo quando il thread viene risvegliato e riacquisisce il lock, può procedere nell'esecuzione.
+      ```
+      lock_acquire(lock);
+      while (condition not true)
+        cv_wait(cond,lock);
+      ... // do stuff
+      lock_release(lock);
+
+      lock_acquire(lock);
+      ... // modify condition
+      cv_signal(cond);
+      lock_release(lock);
+
+      ```
+      Una variante di queste *condition variables* ma che usano **spinlocks** (al posto dei semafori) sono i `wait channels`, usati per le sincronizzazioni a livello kernel.
+      
 
 - **Scheduling**:
  
-    - **Xv6**: Utilizza un algoritmo di scheduling a round-robin, assegnando a ciascun processo un quantum di tempo.
-    - **Os161**: Utilizza un algoritmo di scheduling simile, come round-robin o altri algoritmi in base alla configurazione.
+    - **Xv6**: Utilizza un algoritmo di scheduling a round-robin, assegnando a ciascun processo un quantum di tempo. *NON implementa processi o thread con priorità*
+    - **Os161**: OS161 fornisce per impostazione predefinita una semplice **coda unica round-robin**. Funziona così:
+
+      1) `hardclock` from `kern/thread/clock.c` verrà chiamato  periodicamente (dal gestore dell'interruzione dell'orologio hardware)
+
+      2) A seconda di come impostato lo `schedule`, si definisce l'ordine 
+       
+      3) Quindi chiamerà `thread_yield`  per far sì che il $thread_1$ corrente ceda la CPU al $thread_2$. $thread_1$ va in sleep
+
+      A differenza di *xv6*, posso *giocare* con le `priorità` in modo da assegnare ad ogni thread un' *importanza* più o meno alta a seconda della funzionalità o contesto. Usiamo la funzione `schedule` per dare ai *thread interattivi* una priorità più alta. Ci sono due ragioni:
+
+      - *Il tuo tempo è più prezioso di quello del computer*. Quindi, in generale, dovremmo servire prima quei thread che interagiscono con te. Ad esempio, non vuoi aspettare che il computer sia in una shell mentre è impegnato a eseguire il backup, giusto?
+
+      - *I thread interattivi tendono ad essere vincolati all'I/O, il che significa che spesso rimangono bloccati in attesa di input o output*. Quindi normalmente non riescono a consumare il tempo concesso loro. In questo modo possiamo passare ai thread vincolati al calcolo quando si bloccano e aumentare l'utilizzo del computer.
+
+      Se *state* di un thread è **S_READY**, significa che il thread corrente ha consumato tutto il suo intervallo di tempo ed è costretto a cedere a un altro thread (tramite il timer haerdware). Quindi possiamo supporre che non sia interattivo o che richieda molti calcoli. Tuttavia, se *newstate* è **S_SLEEP**, significa che il thread corrente si offre di cedere a un altro thread , magari in attesa di I/O o di un mutex. Quindi possiamo supporre che questo thread sia più interattivo o che richieda I/O.
+
 
 ### Conclusioni
 
