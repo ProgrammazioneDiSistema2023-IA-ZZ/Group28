@@ -589,6 +589,109 @@ void scheduler(void)
 
 ```
 
+
+### File System
+
+Lo scopo di un file system è organizzare e archiviare i dati. I file system supportano tipicamente la condivisione di dati tra utenti e applicazioni, oltre alla persistenza in modo che i dati siano ancora disponibili dopo un riavvio.
+Il file system di xv6 fornisce file, directory e percorsi simili a Unix e archivia i suoi dati su un disco IDE per garantire la persistenza.
+
+Attualmente i file xv6 sono limitati a 268 blocchi o 268*BSIZE byte (BSIZE è 1024 in xv6, `fs.h`). Questo limite deriva dal fatto che un inode xv6 contiene 12 numeri di blocco “diretti” e un numero di blocco “singolarmente indiretto”, che si riferisce a un blocco che contiene fino a 256 numeri di blocco in più, per un totale di 12 256=268 blocchi.
+
+<div id="Figure 7" align="center">
+    <figure>
+     <img src="Immagini\xv6\fslayer.jpg" width="188" height="216">
+     <figcaption>Figura 7: Livelli del file system di xv6.</figcaption>
+    </figure>  
+</div>
+
+L'implementazione del sistema di file di xv6 è organizzata in sette livelli, come mostrato nella <A href="#Figure 7">Figura 7</A>:
+- Il livello **Disk**: legge e scrive blocchi su un hard disk IDE. 
+- Il livello **Buffer cache** ha due funzioni fondamentali: 
+  1) sincronizzare l'accesso ai blocchi del disco per garantire che solo una copia di un blocco sia in memoria e che solo un thread del kernel alla volta utilizzi quella copia.
+
+        Se un *kernel thread* ha ottenuto un riferimento a un buffer ma non lo ha ancora rilasciato, le chiamate degli altri thread per lo stesso blocco rimarranno in attesa. I livelli più alti del file system si affidano alla sincronizzazione dei *buffer cache*
+
+  2) memorizzare nella cache i blocchi più popolari in modo che non vengano riletti dal disco lento. Il codice è in `bio.c`. 
+
+        *Buffer cache* ha un numero fisso di buffer per contenere i blocchi del disco, il che significa che se il file system richiede un blocco che non è già nella cache, la cache del buffer deve riciclare un buffer che attualmente contiene qualche altro blocco. La *buffer cache* ricicla il buffer utilizzato meno di recente per il nuovo blocco. Il presupposto è che: *il buffer utilizzato meno di recente sia quello con meno probabilità che venga utilizzato nuovamente a breve*.
+
+- Il livello **Logging**: consente ai livelli superiori di incapsulare gli aggiornamenti a diversi blocchi in una transazione e garantisce che i blocchi vengano aggiornati atomicamente in caso di arresti anomali (cioè, tutti vengono aggiornati o nessuno).
+
+    Xv6 risolve il problema dei crash durante le operazioni del file system con una semplice versione di *logging*. Una chiamata di sistema xv6 non scrive direttamente le strutture dati del file system su disco. Invece, inserisce una descrizione di tutte le scritture che desidera effettuare in un log sul disco. Una volta che la chiamata di sistema ha registrato tutte le sue scritture, scrive uno speciale record di commit sul disco indicando che il log contiene un'operazione completa. A quel punto la chiamata di sistema copia le scritture nelle strutture dati del file system su disco. Una volta completate tali scritture, la chiamata di sistema cancella il registro su disco.
+
+    Se il sistema dovesse bloccarsi e riavviarsi, il codice del file system viene ripristinato dal crash come segue, prima di eseguire qualsiasi processo. Se il registro è contrassegnato come contenente un'operazione completa, il codice di ripristino copia le scritture nella posizione in cui appartengono nel file system su disco. Se il registro non è contrassegnato come contenente un'operazione completa, il codice di ripristino ignora il registro. Il codice di ripristino termina cancellando il registro.
+
+    Un esempio di log si ha in *filewrite*:
+    ``` c
+    begin_trans();
+    ilock(f->ip);
+    r = writei(f->ip, ...);
+    iunlock(f->ip);
+    commit_trans();
+    ```
+
+- Il livello **Inode e Block Allocator**: fornisce file senza nome, ciascuno rappresentato utilizzando un `inode`  (<A href="#Figure 8">Figura 8</A>) e una sequenza di blocchi che contengono i dati del file.
+
+    <div id="Figure 8" align="center">
+        <figure>
+        <img src="Immagini\xv6\inode.jpg" width="368" height="322">
+        <figcaption>Figura 8: inode.</figcaption>
+        </figure>  
+    </div>
+
+    Il file system deve disporre di un piano per la posizione in cui archiviare gli inode e i blocchi di contenuto sul disco. Per fare ciò, xv6 divide il disco in diverse sezioni, come mostrato nella <A href="#Figure 9">Figura 9</A>. Il file system non utilizza il blocco 0 (contiene il settore di avvio). Il blocco 1 è chiamato *superblocco*; contiene metadati sul file system (la dimensione del file system in blocchi, il numero di blocchi di dati, il numero di inode e il numero di blocchi nel log). I blocchi che iniziano da 2 contengono inode, con più inode per blocco. Successivamente vengono visualizzati i blocchi bitmap che tengono traccia dei blocchi di dati in uso. La maggior parte dei blocchi rimanenti sono blocchi di dati che contengono il contenuto di file e directory. 
+
+    Il contenuto di file e directory viene archiviato in blocchi di dischi, che devono essere allocati da un pool libero. Il *block allocator* di xv6 mantiene una bitmap libera sul disco, con un bit per blocco. Un bit $0$ indica che il blocco corrispondente è libero; un bit $1$ indica che è in uso. I bit corrispondenti al settore di avvio, al superblocco, ai blocchi di inode e ai blocchi di bitmap sono sempre impostati.
+
+    ---
+    Il termine **inode** può avere uno dei due significati correlati: 
+    - potrebbe fare riferimento alla struttura dei dati su disco contenente la dimensione di un file e l'elenco dei numeri dei blocchi di dati. 
+    - potrebbe riferirsi a un inode in memoria, che contiene una copia dell'inode su disco oltre a informazioni aggiuntive necessarie all'interno del kernel.
+
+    Tutti gli inode su disco sono raggruppati in *un'area contigua* del disco chiamata *inode's block*. Ogni inode ha la stessa dimensione, quindi è facile, dato un numero $n$ ( detto *inode number*), trovare l'ennesimo inode sul disco.
+
+    L'inode su **disco** è definito da una *struct dinode*. Il campo $tipo$ distingue tra file, directory e file speciali (dispositivi). Un tipo zero indica che un inode su disco è libero. Il campo $nlink$ conta il numero di voci della directory che fanno riferimento a questo inode, per riconoscere quando l'inode dovrebbe essere liberato. Il campo $dimension$ registra il numero di byte di contenuto nel file. L'array degli $indirizzi$ registra i numeri dei blocchi del disco che contengono il contenuto del file.
+
+    Il **kernel** mantiene in memoria l'insieme degli inode attivi; *struct inode* è la copia in memoria di una *struct dinode* (`file.h`) su disco. Il kernel memorizza un inode in memoria solo se ci sono puntatori C che fanno riferimento a quell'inode. Il campo $ref$ conta il numero di puntatori C che si riferiscono all'inode in memoria e il kernel scarta l'inode dalla memoria se il conteggio dei riferimenti scende a zero. Le funzioni `iget` e `iput` acquisiscono e rilasciano puntatori a un inode, modificando il conteggio dei riferimenti.
+    
+    ``` c
+    // in-memory copy of an inode
+    struct inode {
+    uint dev;           // Device number
+    uint inum;          // Inode number
+    int ref;            // Reference count
+    struct sleeplock lock; // protects everything below here
+    int valid;          // inode has been read from disk?
+
+    short type;         // copy of disk inode
+    short major;
+    short minor;
+    short nlink;
+    uint size;
+    uint addrs[NDIRECT+1];
+    };
+    ```
+
+    ---
+
+- Il livello **Directory inodes**: implementa ogni directory come un tipo speciale di inode il cui contenuto è una sequenza di voci di directory, ciascuna delle quali contiene un nome e un riferimento $i$ all'inode del file indicato. 
+- Il livello **Pathname**: fornisce nomi di path gerarchici come `/usr/rtm/xv6/fs.c` e li risolve con una ricerca ricorsiva.
+
+- Il livello **File Descriptor**: astrae molte risorse Unix (ad esempio, pipe, dispositivi, file, ecc.) utilizzando l'interfaccia del sistema di file, semplificando la vita degli sviluppatori.
+
+    <div id="Figure 9" align="center">
+        <figure>
+        <img src="Immagini\xv6\fslayout.jpg" width="447" height="59">
+        <figcaption>Figura 9: Struttura del file system di xv6.</figcaption>
+        </figure>  
+    </div>
+
+    Un aspetto dell'interfaccia Unix è che la maggior parte delle risorse in Unix sono rappresentate come file, inclusi dispositivi come la console, le pipe e, naturalmente, i file reali. Il livello *file descriptor* è il livello che raggiunge questa uniformità.
+
+    Xv6 fornisce a ogni processo la propria *tabella di file aperti*, o descrittori di file. Ogni file aperto è rappresentato da un file struct, che è un wrapper attorno a un inode o a una pipe, più un i/o compensare. Ogni chiamata a open crea un file newopen (un nuovo file struct): se più processi aprono lo stesso file in modo indipendente, le diverse istanze avranno offset di i/o diversi. D'altra parte, un singolo file aperto (lo stesso file struct) può apparire più volte nella tabella dei file di un processo e anche nelle tabelle dei file di più processi. Ciò accadrebbe se un processo utilizzasse open per aprire il file e poi creasse alias utilizzando dup o lo condividesse con un bambino utilizzando fork. Un conteggio dei riferimenti tiene traccia del numero di riferimenti a un particolare file aperto. Un file può essere aperto in lettura o in scrittura o in entrambi. I campi leggibili e scrivibili tengono traccia di ciò.
+
+    Tutti i file aperti nel sistema sono conservati in una tabella di file globale, la `ftable` che ha funzioni per: allocare un file (`filealloc`), creare un riferimento duplicato (`filedup`), rilasciare un riferimento (`fileclose`) e leggere e scrivere dati (`fileread` e `filewrite`).
+
 # Note per Mr. Noonzio:
 dovremmo rivedere l'ordine con cui trattiamo gli argomenti in modo che abbiano una consequenzialità 
 
@@ -872,6 +975,27 @@ dovremmo rivedere l'ordine con cui trattiamo gli argomenti in modo che abbiano u
       - *I thread interattivi tendono ad essere vincolati all'I/O, il che significa che spesso rimangono bloccati in attesa di input o output*. Quindi normalmente non riescono a consumare il tempo concesso loro. In questo modo possiamo passare ai thread vincolati al calcolo quando si bloccano e aumentare l'utilizzo del computer.
 
       Se *state* di un thread è **S_READY**, significa che il thread corrente ha consumato tutto il suo intervallo di tempo ed è costretto a cedere a un altro thread (tramite il timer haerdware). Quindi possiamo supporre che non sia interattivo o che richieda molti calcoli. Tuttavia, se *newstate* è **S_SLEEP**, significa che il thread corrente si offre di cedere a un altro thread , magari in attesa di I/O o di un mutex. Quindi possiamo supporre che questo thread sia più interattivo o che richieda I/O.
+
+- **File System**:
+
+    - **Xv6**: Fornisce un sistema di file semplificato, ispirato a quello presente in Unix V6. Include concetti come la gestione di directory, la lettura e scrittura di file, e altre operazioni di base di un sistema di file.
+    - **Os161**: Il file system nativo di OS/161 è chiamato SFS (Simple File System). Sebbene sia un'implementazione relativamente ingenua, SFS vanta la maggior parte delle funzionalità di base che ti aspetteresti da un filesystem:
+
+      - Directory gerarchiche
+      - Supporto di file di grandi dimensioni tramite blocchi indiretti multilivello
+      - Blocco a grana fine per una maggiore concorrenza
+      - Una cache buffer in memoria di dati e metadati del file system
+    
+    Manca il supporto per il file system, inteso comme insieme di system calls che forniscono alcune operazioni sui files. Tale supporto, oltre alla realizzazione delle singole funzioni, necessita di opportune strutture dati che permettono la ricerca dei files e la loro identificazione. Il **VFS** - *Virtual file system*- è in `kern/vfs.c` e `kern/include/vfs.h`, dove la *struct vnode* rappresenta un file e vi sono alcune funzionalità di base come `vfs_open` e `vfs_close`.
+
+    ``` c
+    struct vnode {
+      char *path; //percorso del file/directory
+      unsigned int permissions; //Permessi di accesso al file/directory
+      size_t size; //dimensione del file (solo per i file)
+      //altro...
+    }
+    ```
 
 
 ### Conclusioni
