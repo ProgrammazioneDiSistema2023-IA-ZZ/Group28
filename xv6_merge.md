@@ -161,6 +161,7 @@ Tvinit gestisce in modo particolare T_SYSCALL, la trap di chiamata di sistema de
 
 <div align="center"> 
       <b>Leggenda registri</b>
+      
 | Nome Registro | Descrizione                                             |
 |---------------|---------------------------------------------------------|
 | %cs           | Imposta il livello di protezione (da 0 a 3)             |
