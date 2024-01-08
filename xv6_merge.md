@@ -1,5 +1,39 @@
 # Analisi comparativa tra Os161 e Xv6
 
+## Indice
+
+- [Analisi comparativa tra Os161 e Xv6](#analisi-comparativa-tra-os161-e-xv6)
+  - [Indice](#indice)
+  - [Introduzione](#introduzione)
+  - [Xv6](#xv6)
+    - [Struttura del Kernel](#struttura-del-kernel)
+      - [Processi](#processi)
+    - [Page Tables](#page-tables)
+    - [System Call, Exceptions e Interrupts](#system-call-exceptions-e-interrupts)
+      - [Gestori di trap in Assembly](#gestori-di-trap-in-assembly)
+      - [Gestori di trap in C](#gestori-di-trap-in-c)
+      - [Codice: System Call](#codice-system-call)
+    - [Sincronizzazione](#sincronizzazione)
+      - [Spin Lock](#spin-lock)
+      - [Sleep Lock](#sleep-lock)
+    - [Scheduling](#scheduling)
+      - [Multiplexing](#multiplexing)
+      - [Context switching](#context-switching)
+      - [Scheduler](#scheduler)
+      - [Sleep e Wakeup](#sleep-e-wakeup)
+    - [File System](#file-system)
+  - [Os161](#os161)
+    - [Struttura del Kernel](#struttura-del-kernel-1)
+      - [Processi](#processi-1)
+    - [Gestione della Memoria](#gestione-della-memoria)
+    - [System Call, Exceptions e Interrupts](#system-call-exceptions-e-interrupts-1)
+    - [Sincronizzazione](#sincronizzazione-1)
+    - [Scheduling](#scheduling-1)
+    - [File System](#file-system-1)
+  - [Confronto tra Os161 e Xv6](#confronto-tra-os161-e-xv6)
+    - [Conclusioni](#conclusioni)
+  - [Fonti](#fonti)
+
 ## Introduzione
 
 Questo studio si concentra principalmente sull'analisi del sistema operativo Xv6, confrontandolo con Os161. L'obiettivo di questa analisi comparativa è offrire una panoramica delle capacità di Os161 e Xv6, mettendo in evidenza le differenze e le somiglianze tra questi due sistemi operativi open source.
@@ -77,7 +111,7 @@ La *page table* è una struttura dati utilizzata in xv6 (come in tutti i sistemi
 
 Le istruzioni x86 (sia utente che kernel) manipolano indirizzi virtuali. La RAM della macchina, o memoria fisica, è indicizzata con indirizzi fisici.
 
-In xv6 la memoria virtuale è realizzata tramite **paging hardware** e, a differneza di Os161, non disponde di 'tecniche complesse' come: memoria condivisa, demand paging e COW.
+In xv6 la memoria virtuale è realizzata tramite **paging hardware** e, a differenza di Os161, non dispone di 'tecniche complesse' come: shared memory, demand paging e COW.
 La pagina virtuale è divisa in due livelli:
 - **Livello 0 (PGTBL0)**: contiene una tabella di 512 voci che puntano a pagine virtuali di livello 1
 - **Livello 1 (PGDIR)**: contiene una tabella di 512 voci che puntano a pagine fisiche. Ogni voce ha due campi dati: uno per l'indirizzo fisico della pagina e uno per i bit di accesso alla memoria.
@@ -87,7 +121,7 @@ Dove `PTE_ADDR` è l’indice nella tabella di livello 1 e `offset` è l’offse
 Una pagina virtuale può essere mappata in più pagine fisiche, cioè una stessa pagina virtuale può avere diverse pagine fisiche associate ad essa. Questo avviene quando si esegue un programma compilato con l'opzione `-pg`, ovvero con
 le funzioni di profilatura attiva. In questo caso il kernel crea una copia "shadow" delle pagine del processo e le mappa in modo diverso. Le pagine shadow non sono visibili al processo, ma possono essere utilizzate dal debugger per analizzare il codice sorgente.
 
-#### Modifiche alla paginazione
+**Modifiche alla paginazione**
 Nel file `kernel/vm.c` troviamo le funzionalità relative alla  modifica della paginazione. Ecco le principali:
 - `alloc_page()`: Alloca una pagina fisica libera.
 - `mapmem()`: Mappa una pagina virtuale in una pagina fisica.
@@ -123,10 +157,10 @@ Ciascun PTE contiene bit di flag che indicano all'hardware di paging come è con
 </div>
 
 La traduzione effettiva degl indirizzi avviene in fasi: 
-1)  Una *page table* è memorizzata in memoria fisica come un albero a due livelli. La radice dell'albero è **CR3** che contiene l'indirizzo fisico del sistema di paginazione: il primo elemento della Page Directory formata da 4096 byte e che contiene 1024 PTE per *page table*. Ogni pagina della *page table*, quindi, è un array di 1024 PTE da 32 bit. 
-2) L'hardware, che gestisce le eccezioni nel caso di mancate corrispondenze nelle tabelle di paging, utilizza i primi 10 bit di un indirizzo virtuale per selezionare un ingresso del page directory. Se, sia l'ingresso del page directory che la PTE non sono presenti, l'hardware di paginazione genera una eccezione. 
+1.  Una *page table* è memorizzata in memoria fisica come un albero a due livelli. La radice dell'albero è **CR3** che contiene l'indirizzo fisico del sistema di paginazione: il primo elemento della Page Directory formata da 4096 byte e che contiene 1024 PTE per *page table*. Ogni pagina della *page table*, quindi, è un array di 1024 PTE da 32 bit. 
+2. L'hardware, che gestisce le eccezioni nel caso di mancate corrispondenze nelle tabelle di paging, utilizza i primi 10 bit di un indirizzo virtuale per selezionare un ingresso del page directory. Se, sia l'ingresso del page directory che la PTE non sono presenti, l'hardware di paginazione genera una eccezione. 
 Questo approccio garantisce un controllo preciso sull'accesso alla memoria virtuale e impedisce l'accesso non autorizzato a regioni di memoria.
-3) I primi 20 bit della Page Directory danno l'informazione su quale Page Table usare per la traduzione virtuale - fisico, e i secondi 10 bit dell'indirizzo virtuale specificano la posizione esatta in PT. I 12 bit di offset completano la traduzione.
+3. I primi 20 bit della Page Directory danno l'informazione su quale Page Table usare per la traduzione virtuale - fisico, e i secondi 10 bit dell'indirizzo virtuale specificano la posizione esatta in PT. I 12 bit di offset completano la traduzione.
 
 ### System Call, Exceptions e Interrupts
 
@@ -151,7 +185,7 @@ Il kernel chiama la funzione `trap_handler()` passando come parametro lo stato d
 La funzione *trap_handler()* determina se il segnale di fault è generato da un errore o da un segnale di interrupt. Nel primo caso chiama la funzione `fault()`, mentre nel secondo caso chiama la funzione `intr()`.
 In entrambi i casi la funzione invoca la funzione corrispondente a quella generata dal segnale di fault o dall'interrupt.
 
-#### Gestori di trap in Assembly
+#### Gestori di trap in Assembly 
 
 L'x86 consente 256 diverse interruzioni. Le interruzioni da 0 a 31 sono definite per eccezioni software, come errori di divisione o tentativi di accesso a indirizzi di memoria non validi. Xv6 mappa le 32 interruzioni hardware nell'intervallo da 32 a 63 e utilizza l'interruzione 64 come interruzione di chiamata di sistema.
 
@@ -509,7 +543,7 @@ void swtch(struct context **old, struct context *new);
 La funzione *swtch* esegue il salvataggio e il ripristino per un cambio di thread.
 Ogni contesto è rappresentato da un struct context*, un puntatore a una struttura memorizzata nello stack kernel coinvolto. Swtch prende due argomenti: struct context **old e struct context *new. Inserisce i registri correnti nello stack e salva il puntatore dello stack in *old. Quindi swtch copia new in %esp, estrae i registri precedentemente salvati e restituisce.
 
-#### Scheduling
+#### Scheduler
 
 Un processo che desidera cedere la CPU deve acquisire il lock della tabella dei processi **ptable.lock**, rilasciare eventuali altri lock che sta tenendo, aggiornare il proprio stato (*proc->state*) e quindi chiamare *sched*. Quest'ultimo verifica le condizioni necessarie, tra cui l'assenza di altri lock e la disabilitazione degli interrupt, e quindi chiama *swtch* per passare al contesto dello scheduler. Lì, avviene la selezione di un nuovo processo eseguibile, seguito da un nuovo passaggio di contesto attraverso swtch, che porta l'esecuzione al nuovo processo.
 
@@ -830,7 +864,13 @@ Inoltre vi è una seconda struttura chiamata `processlist` che è parte dell'imp
 
 ### Gestione della Memoria
 
-**DA AGGIUNGERE**
+La _gestione della memoria_ in Os161 è fondamentale per garantire un ambiente operativo stabile ed efficiente. Come in xv6 adotta la *virtual memory* tramite l'utilizzo di *page table*. Le page tables sono un componente chiave nella gestione della memoria di Os161, svolgendo un ruolo fondamentale nell'ottimizzazione delle prestazioni e nella garanzia di sicurezza e isolamento tra i processi. Inoltre, Os161 implementa varie tecniche avanzate per ottimizzare l'utilizzo della memoria, tra cui l'utilizzo di memoria condivisa (shared memory), il demand paging e la condivisione in lettura/scrittura (Copy-On-Write, COW).
+
+La **memoria condivisa** consente a più processi di accedere e condividere una stessa area di memoria, facilitando la comunicazione e lo scambio di dati tra di essi. Questa tecnica è utile in scenari in cui processi diversi necessitano di collaborare o condividere informazioni senza dover ricorrere a complesse operazioni di copia.
+
+Il **demand paging** è una strategia che consente di caricare in memoria solo le pagine necessarie per l'esecuzione di un processo, ritardando il caricamento delle pagine non ancora utilizzate. Ciò ottimizza l'utilizzo della memoria, riducendo il carico iniziale e consentendo una gestione più efficiente delle risorse di sistema.
+
+La **condivisione in lettura/scrittura** (**Copy-On-Write**, **COW**) è una tecnica che consente a più processi di condividere la stessa area di memoria in modalità di sola lettura. Quando un processo tenta di scrivere in una pagina condivisa, la pagina viene duplicata in modo trasparente, garantendo che ciascun processo abbia la propria copia modificabile. Questo approccio riduce il consumo di memoria e migliora le prestazioni.
     
 ### System Call, Exceptions e Interrupts
 
@@ -888,21 +928,21 @@ Nella versione più aggiornata vi è la possibilità di lavorare su dispositivi 
 2) Rilascia il *lock* quando esce dalla sezione di interesse del codice grazie alla funzione `release()`
 ``` 
 while (true){
-#acquire lock
-critical section 
-release lock
-remainder section
+  #acquire lock
+  critical section 
+  release lock
+  remainder section
 }
 ```
 In Os161 troviamo un lock in particolare: `Spinlock` (*kern/thread/spinlock.c*):
 ``` c
 ...
 while (1) {
-if (spinlock_data_get(&splk -> splk_lock) != 0)
-    continue;   # verifica che il lock non sia già stato acquisito da un altro thread - 0: da acquisire / 1: acquisito
-if (spinlock_data_testandset(&splk -> splk_lock) != 0)
-    continue;  # acquisisce il lock 
-break;
+  if (spinlock_data_get(&splk -> splk_lock) != 0)
+      continue;   # verifica che il lock non sia già stato acquisito da un altro thread - 0: da acquisire / 1: acquisito
+  if (spinlock_data_testandset(&splk -> splk_lock) != 0)
+      continue;  # acquisisce il lock 
+  break;
 }
 /*La funzione `spinlock_data_testandset()` è una funzione atomica che imposta la variabile su 1 solo se era 0, al tramonto dell'istruzione restituisce il valore precedente. Se non era 0, l'istruzione viene ripetuta.*/
 ...
@@ -911,14 +951,14 @@ break;
 
 ```
 wait(S) {
-while(S<=0); 
-//busy wait
-S--;
+  while(S<=0); 
+    //busy wait
+    S--;
 } 
 Decrementa il contatore. Se il contatore diventa negativo, il processo o thread viene messo in attesa.
 
 signal(S){
-S++;
+  S++;
 }
 Incrementa il contatore. Se ci sono processi o thread in attesa, uno di essi viene risvegliato.
 ```
