@@ -410,7 +410,7 @@ Nel momento in cui uno spin-lock viene utilizzato da un gestore di interruzioni,
 
 Un **sleep-lock** è un tipo di lock che può essere rilasciato e acquisito da un thread diverso da quello che lo detiene. Un thread che tenta di acquisire un *sleep-lock* che è già detenuto da un altro thread viene messo in attesa. Quando il thread che detiene il *sleep-lock* lo rilascia, il thread in attesa lo acquisisce e riprende l'esecuzione.
 
-A differenza dei *spin locks*, che continuano a girare in un loop, **sleep-locks* permettono a un thread di andare in stato di *sleep* (attesa) e di essere risvegliato quando il *lock* diventa disponibile, riducendo l'utilizzo della CPU e migliorando l'efficienza 
+A differenza dei *spin locks*, che continuano a girare in un loop, *sleep-locks* permettono a un thread di andare in stato di *sleep* (attesa) e di essere risvegliato quando il *lock* diventa disponibile, riducendo l'utilizzo della CPU e migliorando l'efficienza 
 Nel contesto di xv6, un *sleep lock* ha un campo bloccato protetto da uno spin lock. Quando un thread vuole acquisire il lock, chiama la funzione `acquiresleep`, che, in modo atomico, rilascia la CPU e rilascia lo spin lock, permettendo al thread di andare in attesa. Quando il lock è disponibile, il thread viene risvegliato.
 
 In `proc.c` è gestito quasi interamente le funzioni legate ai processi e ai thread, incluse le loro sincronizzazioni tramite lock. In `sleeplock.h` e `sleeplock.c` invece abbiamo l'implementazione dello *sleep lock* e delle sue funzioni:
@@ -609,7 +609,7 @@ void scheduler(void)
 
 #### Sleep e Wakeup
 
-Meccanismo di sincronizzazione che permette i procesi di interagire tra loro. Sleep e wakeup consentono ai processi nello stato di sleeping di dormire in attesa di un evento e ad un altro processo di svegliarlo una volta che l'evento è avvenuto. Questi meccanismi di coordinamento sono anche chiamati meccanismi di coordinamento sequenziale.
+Meccanismo di sincronizzazione che permette i procesi di interagire tra loro. Sleep e wakeup consentono ai processi nello stato di sleeping di dormire in attesa di un evento e ad un altro processo di svegliarlo una volta che l'evento è avvenuto. Questi meccanismi di coordinamento sono anche chiamati **meccanismi di coordinamento sequenziale**.
 
 Un esempio di implementazione è la seguente:
 
@@ -642,9 +642,9 @@ struct q {
  }
 ```
 
-Questa implementazione evita il problema del "lost wake-up" ed impedisce la generazione di un eventuale deadlock.
+Questa implementazione evita il problema del *lost wake-up* ed impedisce la generazione di un eventuale *deadlock*.
 
-Questo meccanismo non fa busy waiting e i metodi per utilizzarlo sono definiti in proc.c. La chiamata per eseguire la sleep deve necessariamente passare per la funzione sys_sleep contenuta nel file sysproc.c
+Questo meccanismo non fa *busy waiting* e i metodi per utilizzarlo sono definiti in `proc.c`. La chiamata per eseguire la sleep deve necessariamente passare per la funzione `sys_sleep` contenuta nel file `sysproc.c`.
 
 ### File System
 
