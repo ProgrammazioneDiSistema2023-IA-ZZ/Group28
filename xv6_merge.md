@@ -16,11 +16,11 @@
     - [Sincronizzazione](#sincronizzazione)
       - [Spin Lock](#spin-lock)
       - [Sleep Lock](#sleep-lock)
+      - [Sleep e Wakeup](#sleep-e-wakeup)
     - [Scheduling](#scheduling)
       - [Multiplexing](#multiplexing)
       - [Context switching](#context-switching)
       - [Scheduler](#scheduler)
-      - [Sleep e Wakeup](#sleep-e-wakeup)
     - [File System](#file-system)
   - [Os161](#os161)
     - [Struttura del Kernel](#struttura-del-kernel-1)
@@ -58,7 +58,7 @@ Il sistema operativo ha una struttura **monolitica** (come la maggior parte dei 
     </figure>  
 </div>
 
-In questa organizzazione, l'intero sistema operativo viene eseguito con pieno privilegio hardware. Questa organizzazione è conveniente perché il progettista del sistema operativo non deve decidere quale parte del sistema operativo non ha bisogno di pieno privilegio hardware. Inoltre, è facile per diverse parti del sistema operativo cooperare. Ad esempio, un sistema operativo potrebbe avere una cache di buffer che può essere condivisa sia dal sistema di file che dal sistema di memoria virtuale.
+In questa organizzazione, l'intero sistema operativo viene eseguito con pieno privilegio hardware. Questa organizzazione è conveniente perché il progettista del sistema operativo non deve decidere quale parte del sistema operativo non ha bisogno di pieno privilegio hardware. Inoltre, è facile per diverse parti del sistema operativo cooperare. Ad esempio, un sistema operativo potrebbe avere una cache di buffer che può essere condivisa sia dal file system che dal sistema di memoria virtuale.
 
 Un inconveniente dell'organizzazione monolitica è che le interfacce tra le diverse parti del sistema operativo sono spesso complesse, ed è quindi facile per uno sviluppatore del sistema operativo commettere un errore. In un kernel monolitico, un errore è fatale, perché spesso comporta il fallimento del kernel stesso.
 Se il kernel fallisce, il computer smette di funzionare e, di conseguenza, tutte le applicazioni falliscono. Il computer deve essere riavviato per ripartire.
@@ -72,7 +72,7 @@ Per ridurre il rischio di errori nel kernel, i progettisti del sistema operativo
     </figure>  
 </div>
 
-Nella <A href="#Figure 2">Figura 2</A>, il sistema di file viene eseguito come processo a livello utente. I servizi del sistema operativo eseguiti come processi sono chiamati server. Per consentire alle applicazioni di interagire con il file server, il kernel fornisce un meccanismo di comunicazione tra processi per inviare messaggi da un processo a livello utente a un altro.
+Nella <A href="#Figure 2">Figura 2</A>, il file system viene eseguito come processo a livello utente. I servizi del sistema operativo eseguiti come processi sono chiamati server. Per consentire alle applicazioni di interagire con il file server, il kernel fornisce un meccanismo di comunicazione tra processi per inviare messaggi da un processo a livello utente a un altro.
 
 In un microkernel, l'interfaccia del kernel consiste in alcune funzioni a basso livello per avviare applicazioni, inviare messaggi, accedere all'hardware del dispositivo, ecc. Questa organizzazione consente al kernel di essere relativamente semplice, poiché la maggior parte del sistema operativo risiede nei server a livello utente.
 
@@ -174,7 +174,7 @@ In tutti e tre i casi, il design del sistema operativo deve:
 2) Essere configurato per l'esecuzione nel kernel scegliendo un punto in cui far iniziare l'esecuzione del kernel.
 3) Il kernel deve essere in grado di recuperare informazioni sull'evento, ad esempio gli argomenti della chiamata di sistema. 
 
-Tutto deve essere fatto in modo sicuro; il sistema deve mantenere l'isolamento tra i processi utente e il kernel.Per raggiungere questo obiettivo, il sistema operativo deve essere consapevole dei dettagli su come l'hardware gestisce le chiamate di sistema, le eccezioni e le interruzioni. Nella maggior parte dei processori, questi tre eventi sono gestiti da un unico meccanismo hardware.
+Tutto deve essere fatto in modo sicuro; il sistema deve mantenere l'isolamento tra i processi utente e il kernel. Per raggiungere questo obiettivo, il sistema operativo deve essere consapevole dei dettagli su come l'hardware gestisce le chiamate di sistema, le eccezioni e le interruzioni. Nella maggior parte dei processori, questi tre eventi sono gestiti da un unico meccanismo hardware.
 
 Ad esempio, sull'x86, un programma invoca una chiamata di sistema generando un'interruzione mediante l'istruzione `int`. Allo stesso modo, le eccezioni generano anch'esse un'interruzione. Pertanto, se il sistema operativo ha un piano per la gestione delle interruzioni, può gestire anche chiamate di sistema ed eccezioni.
 
@@ -206,8 +206,8 @@ Tvinit gestisce in modo particolare T_SYSCALL, la trap di chiamata di sistema de
 
 Per effettuare una chiamata di sistema sull'x86, un programma richiama l'istruzione int n, dove specifica l'indice nell'IDT. L'istruzione int esegue i seguenti passaggi:
 
- - Recupera l'ennesimo descrittore dall'IDT, dove n è l'argomento di int.
-- Verificare che CPL in %cs sia <= DPL, dove DPL è il livello di privilegio nel descrittore.
+- Recupera l'ennesimo descrittore dall'IDT, dove n è l'argomento di int.
+- Verificare che CPL(Current Privilege Level) in %cs sia <= DPL, dove DPL è il livello di privilegio nel descrittore.
 - Salva %esp e %ss in registri interni alla CPU, ma solo se PL < CPL del selettore del segmento target.
 - Carica %ss e %esp da un descrittore di segmento di attività.
 - Push in ordine dei registri: %ss, %esp, %flag, %cs, %eip .
@@ -271,21 +271,21 @@ int  sys_getyear(void)
 } 
 ```
 6) Per testare il corretto funzionamento della *system call* appena implementata bisogna modificare il programma a livello utente includendo il file di intestazione che definisce la nuova chiamata di sistema e chiamando la funzione della chiamata di sistema con gli argomenti appropriati.
-``` C
+``` c
 #include "types.h"
 #include "stat.h"
 #include "user.h"
 
 int main(void) 
 {
-printf(1, "Note: Unix V6 was released in year %d\n", getyear());
-    exit();
+  printf(1, "Note: Unix V6 was released in year %d\n", getyear());
+  exit();
 } 
 ```
 
 7) Modificare il `Makefile` aggiungendo la nuova *system call* alla lista di quelle già esistenti. Build e test.
 
-```
+``` sh
 make clean
 make
 ```
@@ -415,7 +415,7 @@ Nel contesto di xv6, un *sleep lock* ha un campo bloccato protetto da uno spin l
 
 In `proc.c` è gestito quasi interamente le funzioni legate ai processi e ai thread, incluse le loro sincronizzazioni tramite lock. In `sleeplock.h` e `sleeplock.c` invece abbiamo l'implementazione dello *sleep lock* e delle sue funzioni:
 
-``` C
+``` c
 // Long-term locks for processes
 struct sleeplock {
   uint locked;       // Is the lock held?
@@ -457,7 +457,6 @@ releasesleep(struct sleeplock *lk)
   release(&lk->lk);
 }
 
-
 ```
 
 Gli *sleep-lock* di Xv6 supportano il rilascio del processore durante le loro sezioni critiche. Per evitare casi di deadlock, la routine di acquisizione del blocco di attesa (chiamata *acquiresleep*) rilascia il processore in modo atomico durante l'attesa e non disabilita gli interrupt.
@@ -465,9 +464,49 @@ Gli *sleep-lock* di Xv6 supportano il rilascio del processore durante le loro se
 A un livello elevato, uno *sleep-lock* ha un campo bloccato che è protetto da un spinlock, e la chiamata a sleep di *acquiresleep* cede atomicamente la CPU e rilascia lo spin-lock. Il risultato è che altri thread possono eseguire mentre *acquiresleep* aspetta. Poiché gli sleep-lock lasciano gli interrupt abilitati, non possono essere utilizzati negli interrupt. Inoltre, dato che *acquiresleep* può cedere il processore, gli *sleep-lock* non possono essere utilizzati all'interno di sezioni critiche di spin-lock
 
 Xv6 utilizza spin-lock nella maggior parte delle situazioni, poiché hanno un basso overhead. 
-Utilizza gli sleep-lock solo nel sistema di file, dove è conveniente poter detenere i blocchi attraverso lunghe operazioni disco.
+Utilizza gli sleep-lock solo nel file system, dove è conveniente poter detenere i blocchi attraverso lunghe operazioni disco.
 
 Gli spin-lock sono più adatti per brevi sezioni critiche, poiché attendere su di essi spreca tempo CPU; gli sleep-lock funzionano bene per operazioni prolungate.
+
+
+#### Sleep e Wakeup
+
+Meccanismo di sincronizzazione che sfrutta il funzionamento dei lock per permette ai processi di interagire tra loro. Sleep e wakeup consentono ai processi nello stato di sleeping di dormire in attesa di un evento e ad un altro processo di svegliarlo una volta che l'evento è avvenuto. Questi meccanismi di coordinamento sono anche chiamati **meccanismi di coordinamento sequenziale**.
+
+Un esempio di implementazione è la seguente:
+
+```c
+struct q {
+     struct spinlock lock;
+     void *ptr;
+ };
+
+ void* send(struct q *q, void *p)
+ {
+    acquire(&q->lock);
+    while(q->ptr != 0)
+        ;
+    q->ptr = p;
+    wakeup(q);
+    release(&q->lock);
+ }
+
+ void* recv(struct q *q)
+ {
+  void *p;
+
+    acquire(&q->lock);
+    while((p = q->ptr) == 0)
+        sleep(q, &q->lock);
+    q->ptr = 0;
+    release(&q->lock);
+    return p;
+ }
+```
+
+Questa implementazione evita il problema del *lost wake-up* ed impedisce la generazione di un eventuale *deadlock*.
+
+Questo meccanismo non fa *busy waiting* e i metodi per utilizzarlo sono definiti in `proc.c`. La chiamata per eseguire la sleep deve necessariamente passare per la funzione `sys_sleep` contenuta nel file `sysproc.c`.
 
 ### Scheduling
 
@@ -493,7 +532,7 @@ Il passaggio da un thread a un altro comporta il salvataggio dei registri CPU de
 
 In `swtch.S` troviamo il codice assembly per il context switching a livello kernel: 
 
-``` assembly 
+``` s
 .globl swtch
 swtch:
   movl 4(%esp), %eax
@@ -607,45 +646,6 @@ void scheduler(void)
 
 ```
 
-#### Sleep e Wakeup
-
-Meccanismo di sincronizzazione che permette i procesi di interagire tra loro. Sleep e wakeup consentono ai processi nello stato di sleeping di dormire in attesa di un evento e ad un altro processo di svegliarlo una volta che l'evento è avvenuto. Questi meccanismi di coordinamento sono anche chiamati **meccanismi di coordinamento sequenziale**.
-
-Un esempio di implementazione è la seguente:
-
-```c
-struct q {
-     struct spinlock lock;
-     void *ptr;
- };
-
- void* send(struct q *q, void *p)
- {
-    acquire(&q->lock);
-    while(q->ptr != 0)
-        ;
-    q->ptr = p;
-    wakeup(q);
-    release(&q->lock);
- }
-
- void* recv(struct q *q)
- {
-  void *p;
-
-    acquire(&q->lock);
-    while((p = q->ptr) == 0)
-        sleep(q, &q->lock);
-    q->ptr = 0;
-    release(&q->lock);
-    return p;
- }
-```
-
-Questa implementazione evita il problema del *lost wake-up* ed impedisce la generazione di un eventuale *deadlock*.
-
-Questo meccanismo non fa *busy waiting* e i metodi per utilizzarlo sono definiti in `proc.c`. La chiamata per eseguire la sleep deve necessariamente passare per la funzione `sys_sleep` contenuta nel file `sysproc.c`.
-
 ### File System
 
 Lo scopo di un file system è organizzare e archiviare i dati. I file system supportano tipicamente la condivisione di dati tra utenti e applicazioni, oltre alla persistenza in modo che i dati siano ancora disponibili dopo un riavvio.
@@ -660,7 +660,7 @@ Attualmente i file xv6 sono limitati a 268 blocchi o 268*BSIZE byte (BSIZE è 10
     </figure>  
 </div>
 
-L'implementazione del sistema di file di xv6 è organizzata in sette livelli, come mostrato nella <A href="#Figure 8">Figura 8</A>:
+L'implementazione del file system di xv6 è organizzata in sette livelli, come mostrato nella <A href="#Figure 8">Figura 8</A>:
 - Il livello **Disk**: legge e scrive blocchi su un hard disk IDE. 
 - Il livello **Buffer cache** ha due funzioni fondamentali: 
   1) sincronizzare l'accesso ai blocchi del disco per garantire che solo una copia di un blocco sia in memoria e che solo un thread del kernel alla volta utilizzi quella copia.
@@ -730,7 +730,7 @@ L'implementazione del sistema di file di xv6 è organizzata in sette livelli, co
 - Il livello **Directory inodes**: implementa ogni directory come un tipo speciale di inode il cui contenuto è una sequenza di voci di directory, ciascuna delle quali contiene un nome e un riferimento $i$ all'inode del file indicato. 
 - Il livello **Pathname**: fornisce nomi di path gerarchici come `/usr/rtm/xv6/fs.c` e li risolve con una ricerca ricorsiva.
 
-- Il livello **File Descriptor**: astrae molte risorse Unix (ad esempio, pipe, dispositivi, file, ecc.) utilizzando l'interfaccia del sistema di file, semplificando la vita degli sviluppatori.
+- Il livello **File Descriptor**: astrae molte risorse Unix (ad esempio, pipe, dispositivi, file, ecc.) utilizzando l'interfaccia del file system, semplificando la vita degli sviluppatori.
 
 <div id="Figure 10" align="center">
     <figure>
@@ -780,7 +780,7 @@ Lo *spazio di indirizzamento virtuale* fa riferimento alla vista logica di come 
 
 
 Nel kernel OS/161, i processi sono organizzati attraverso una struttura dati denominata **coda di esecuzione dei processi**. La coda è implementata come una lista doppiamente concatenata, e il suo header si trova nel file `kern/include/threadlist.h`. Questa lista contiene i processi attualmente in esecuzione sul sistema.
-``` C
+``` c
 struct threadlistnode {
   struct threadlistnode *tln_prev;
   struct threadlistnode *tln_next;
@@ -926,7 +926,7 @@ int sys_read(int filehandle, char *buf, size_t size) {
 Nella versione più aggiornata vi è la possibilità di lavorare su dispositivi multiprocessori, quindi la gestione e l'accesso alle *sezioni critiche* è fondamentale. In *Os161* vengono riproposti i `mutex lock` per proteggere le *sezioni critiche* e evitare *race conditions*: 
 1) Un processo acquisisce il *lock* prima di entrare nella *sezione critica* usando la funzione `acquire()`
 2) Rilascia il *lock* quando esce dalla sezione di interesse del codice grazie alla funzione `release()`
-``` 
+``` c
 while (true){
   #acquire lock
   critical section 
@@ -949,18 +949,18 @@ while (1) {
 ```
 *Os161* però utilizza altre tecniche di sincronizzazione più sofisticate; tra queste ci sono i `semafori`. Un semaforo **S** è un valore intero che permette l'accesso a due operazioni **atomiche**: `signal` e `wait()`
 
-```
+``` c
 wait(S) {
   while(S<=0); 
     //busy wait
     S--;
 } 
-Decrementa il contatore. Se il contatore diventa negativo, il processo o thread viene messo in attesa.
+//Decrementa il contatore. Se il contatore diventa negativo, il processo o thread viene messo in attesa.
 
 signal(S){
   S++;
 }
-Incrementa il contatore. Se ci sono processi o thread in attesa, uno di essi viene risvegliato.
+//Incrementa il contatore. Se ci sono processi o thread in attesa, uno di essi viene risvegliato.
 ```
 In Os161 il codice relativo ai semafori: creazione,gestione ecc può essere letto in `kern/thread/synch.c` e `kern/thread/synch.h`
 ``` c
@@ -969,7 +969,7 @@ struct semaphore{
     char *name;
 };
 ```
-A differenza di *xv6*, in Os161 i processi hanno un campo extra che ne definisce la `priorità`. In ambito di sincronizzazione è un fattore di cui tener conto: si disabilitano gli *interrupts* del timer prima dell'ingresso nella *sezione critica* e si riabilitano all'uscita. Questa tecnica si basa sul fattocceh i thread con priorità più bassa **non possono interrompere** l'esecuzione di un thread con priorità superiore. In altre parole, i thread con priorità superiore devono attendere che un thread con priorità superiore abbandoni la *sezione critica* prima di poter essere eseguiti.
+A differenza di *xv6*, in Os161 i processi hanno un campo extra che ne definisce la `priorità`. In ambito di sincronizzazione è un fattore di cui tener conto: si disabilitano gli *interrupts* del timer prima dell'ingresso nella *sezione critica* e si riabilitano all'uscita. Questa tecnica si basa sul fatto che i thread con priorità più bassa **non possono interrompere** l'esecuzione di un thread con priorità superiore. In altre parole, i thread con priorità superiore devono attendere che un thread con priorità superiore abbandoni la *sezione critica* prima di poter essere eseguiti.
 Una semplice interfaccia per la gestione dell'interrupt è nel file: `kern/arch/mips/include/spl.h`.
 
 *Os161* usa anche i `lock`: 
@@ -979,10 +979,10 @@ lock_aquire(mylock);
 // critical section 
 lock_release(mylock);
 ```
-I lock sono molto simili a dei *semafori binari* conun valore iniziale $S = 1$ ma con un ulteriore imposizione: *il thread che rilascia il lock deve essere lo stesso che lo ha acquisito*
+I lock sono molto simili a dei *semafori binari* con un valore iniziale $S = 1$ ma con un ulteriore imposizione: *il thread che rilascia il lock deve essere lo stesso che lo ha acquisito*
 
-Vi sono altre tecniche che permettono di ottimizzare la sincronizzazione di thread e/o processi, tra queste vi sono le `condition variables` che permettono ai thread di sospendersi quando non sono in grado di procedere a causa di una condizione specifica. Questa *variabile* funge da meccanismo di notifica, consentendo ad altri thread di segnalare al thread in attesa che la condizione desiderata è stat soddisfatta. Solo quando il thread viene risvegliato e riacquisisce il lock, può procedere nell'esecuzione.
-```
+Vi sono altre tecniche che permettono di ottimizzare la sincronizzazione di thread e/o processi, tra queste vi sono le `condition variables` che permettono ai thread di sospendersi quando non sono in grado di procedere a causa di una condizione specifica. Questa *variabile* funge da meccanismo di notifica, consentendo ad altri thread di segnalare al thread in attesa che la condizione desiderata è stata soddisfatta. Solo quando il thread viene risvegliato e riacquisisce il lock, può procedere nell'esecuzione.
+``` c
 lock_acquire(lock);
 while (condition not true)
 cv_wait(cond,lock);
@@ -1060,7 +1060,7 @@ size_t size; //dimensione del file (solo per i file)
 - **Gestione dei Processi**:
      
     - **Xv6**: I processi costituiscono l'unità fondamentale di isolamento. Ogni processo ha il proprio spazio degli indirizzi virtuale.
-    - **Os161**: Utilizza una struttura di processo simile, ma l'implementazione può variare a seconda dell'architettura di destinazione.macchina privata con memoria e CPU dedicate.
+    - **Os161**: Utilizza una struttura di processo simile, ma l'implementazione può variare a seconda dell'architettura di destinazione macchina privata con memoria e CPU dedicate.
 
 - **System Call, Exceptions e Interrupts**:
  
@@ -1079,7 +1079,7 @@ size_t size; //dimensione del file (solo per i file)
 
 - **File System**:
 
-    - **Xv6**: Fornisce un sistema di file semplificato, ispirato a quello presente in Unix V6. Include concetti come la gestione di directory, la lettura e scrittura di file, e altre operazioni di base di un sistema di file.
+    - **Xv6**: Fornisce un file system semplificato, ispirato a quello presente in Unix V6. Include concetti come la gestione di directory, la lettura e scrittura di file, e altre operazioni di base di un file system.
     - **Os161**: Implementa un file system simile, che supporta file, directory e percorsi simili a Unix.
  
 
