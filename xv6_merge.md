@@ -1055,22 +1055,17 @@ size_t size; //dimensione del file (solo per i file)
 - **Gestione della Memoria**:
   
     - **Xv6**: Implementa un sistema di gestione della memoria basato su paging. Le page tables consentono il controllo degli indirizzi di memoria, permettendo a Xv6 di multiplexare gli spazi degli indirizzi di processi diversi su una singola memoria fisica e proteggere le memorie di processi diversi.
-    - **Os161**: Anche Os161 utilizza page tables e presenta concetti di gestione della memoria simili.
-
-- **Gestione dei Processi**:
-     
-    - **Xv6**: I processi costituiscono l'unità fondamentale di isolamento. Ogni processo ha il proprio spazio degli indirizzi virtuale.
-    - **Os161**: Utilizza una struttura di processo simile, ma l'implementazione può variare a seconda dell'architettura di destinazione macchina privata con memoria e CPU dedicate.
+    - **Os161**: Anche Os161 utilizza page tables e presenta concetti di gestione della memoria simili, ma implementa anche varie tecniche avanzate per ottimizzare l'utilizzo di memoria come: shared memory, demand paging e Copy-On-Write.
 
 - **System Call, Exceptions e Interrupts**:
  
     - **Xv6**: Gestisce system call, eccezioni e interrupts attraverso un meccanismo comune. Le interfacce di sistema sono implementate tramite trap (o interrupt), e il kernel decide come gestire l'evento in base al numero di trap.
-    - **Os161**: Simile a xv6, gestisce system calls, interrupts ed exceptions in modo da facilitare l'esecuzione del sistema operativo.
+    - **Os161**: Simile a xv6, gestisce system calls, interrupts ed exceptions in modo da facilitare l'esecuzione del sistema operativo. Le principali differenze sono di carattere implementativo (dovute principalemente all'architettura) e inoltre Os161 presenta una maggiore astrazione e modularità con un maggiore isolamento (dovuto all'utilizzo del microkernel).
 
 - **Sincronizzazione**:
  
-    - **Xv6**: Utilizza spin-lock e sleep-lock per garantire l'accesso esclusivo alle risorse condivise tra i processi. Gli spin-lock sono utilizzati in sezioni critiche di breve durata, mentre gli sleep-lock supportano il rilascio temporaneo del processore.
-    - **Os161**: Implementa meccanismi di sincronizzazione simili, come semafori e lock.
+    - **Xv6**: Utilizza spin-lock e sleep-lock per garantire l'accesso esclusivo alle risorse condivise tra i processi. Gli spin-lock sono utilizzati in sezioni critiche di breve durata, mentre gli sleep-lock supportano il rilascio temporaneo del processore. Inoltre implementa il meccanismo di sincronizzazione con wakeup e sleep per l'interazione tra i processi.
+    - **Os161**: Implementa meccanismi di sincronizzazione simili, come spinlock, mutex lock (sleep lock) e wait channel (wakeup e sleep) però aggiunge come tecnica di sincronizzazione più sofisticata i semafori. Inoltre in Os161 i processi hanno un campo extra per defirnirne la priorità in modo che i thread con piriorità più bassa non possano interrompere l'esecuzione di un thread con priorità superiore.
 
 - **Scheduling**:
  
@@ -1080,7 +1075,7 @@ size_t size; //dimensione del file (solo per i file)
 - **File System**:
 
     - **Xv6**: Fornisce un file system semplificato, ispirato a quello presente in Unix V6. Include concetti come la gestione di directory, la lettura e scrittura di file, e altre operazioni di base di un file system.
-    - **Os161**: Implementa un file system simile, che supporta file, directory e percorsi simili a Unix.
+    - **Os161**: Implementa il Simple File System (SFS), che possiede buona parte delle funzionalità base di un file system. Supporta file, directory e percorsi simili a Unix.
  
 
 ### Conclusioni
