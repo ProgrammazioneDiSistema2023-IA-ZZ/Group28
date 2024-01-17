@@ -31,7 +31,7 @@
     - [Scheduling](#scheduling-1)
     - [File System](#file-system-1)
   - [Confronto tra Os161 e Xv6](#confronto-tra-os161-e-xv6)
-    - [Conclusioni](#conclusioni)
+    - [Conclusione](#conclusione)
   - [Fonti](#fonti)
 
 ## Introduzione
@@ -510,7 +510,7 @@ Questo meccanismo non fa *busy waiting* e i metodi per utilizzarlo sono definiti
 
 ### Scheduling
 
-Ogni sistema operativo deve adottare un algoritmo di scheduling per decidere quale processo eseguire. Questo perché, anche in condizioni di multiprocessore, il numero di processi da eseguire sono maggiori del numero di processori disponibili. Xv6 utilizza un semplice algoritmo di scheduling a round-robin, che assegna a ciascun processo un intervallo di tempo fisso, chiamato quantum, durante il quale il processo può eseguire. Quando il quantum di un processo scade, Xv6 interrompe il processo e sceglie un altro processo da eseguire. É un algoritmo a priorità fissa in quanto tutti i processi hanno la stessa importanza nell'essere eseguiti.
+Ogni sistema operativo deve adottare un algoritmo di scheduling per decidere quale processo eseguire. Questo perché, anche in condizioni di multiprocessore, il numero di processi da eseguire sono maggiori del numero di processori disponibili. Xv6 utilizza un semplice algoritmo di scheduling a round-robin, che assegna a ciascun processo un intervallo di tempo fisso, chiamato quantum, durante il quale il processo può essere eseguito. Quando il quantum di un processo scade, Xv6 interrompe il processo e sceglie un altro processo da eseguire. É un algoritmo a priorità fissa in quanto tutti i processi hanno la stessa importanza nell'essere eseguiti.
 
 #### Multiplexing
 
@@ -1078,7 +1078,7 @@ size_t size; //dimensione del file (solo per i file)
     - **Os161**: Implementa il Simple File System (SFS), che possiede buona parte delle funzionalità base di un file system. Supporta file, directory e percorsi simili a Unix.
  
 
-### Conclusioni
+### Conclusione
 
 In generale, entrambi xv6 e OS/161 forniscono un'esperienza pratica nell'implementazione dei concetti chiave dei sistemi operativi, ma differiscono nell'approccio e nell'architettura di destinazione.
 
