@@ -510,7 +510,7 @@ Questo meccanismo non fa *busy waiting* e i metodi per utilizzarlo sono definiti
 
 ### Scheduling
 
-Ogni sistema operativo deve adottare un algoritmo di scheduling per decidere quale processo eseguire. Questo perché, anche in condizioni di muliprocessore, il numero di processi da eseguire sono maggiori del numero di processori disponibili. Xv6 utilizza un semplice algoritmo di scheduling a round-robin, che assegna a ciascun processo un intervallo di tempo fisso, chiamato quantum, durante il quale il processo può eseguire. Quando il quantum di un processo scade, Xv6 interrompe il processo e sceglie un altro processo da eseguire. É un algoritmo a priorità fissa in quanto tutti i processi hanno la stessa importanza nell'essere eseguiti.
+Ogni sistema operativo deve adottare un algoritmo di scheduling per decidere quale processo eseguire. Questo perché, anche in condizioni di multiprocessore, il numero di processi da eseguire sono maggiori del numero di processori disponibili. Xv6 utilizza un semplice algoritmo di scheduling a round-robin, che assegna a ciascun processo un intervallo di tempo fisso, chiamato quantum, durante il quale il processo può eseguire. Quando il quantum di un processo scade, Xv6 interrompe il processo e sceglie un altro processo da eseguire. É un algoritmo a priorità fissa in quanto tutti i processi hanno la stessa importanza nell'essere eseguiti.
 
 #### Multiplexing
 
@@ -1069,8 +1069,8 @@ size_t size; //dimensione del file (solo per i file)
 
 - **Scheduling**:
  
-    - **Xv6**: Utilizza un algoritmo di scheduling a round-robin, assegnando a ciascun processo un quantum di tempo.
-    - **Os161**: Utilizza un algoritmo di scheduling simile, come round-robin o altri algoritmi in base alla configurazione.
+    - **Xv6**: Utilizza un algoritmo di scheduling a round-robin, assegnando a ciascun processo un quantum di tempo. É un algoritmo di scheduling a priorità fissa in quanto tutti processi hanno la stessa importanza.
+    - **Os161**: di default utilizza una coda unica round-robin, ma permette di modificare le priorità dei processi in modo da assegnare ad ogni thread un'importanza più o meno alta a seconda della funzionalità o contesto.
 
 - **File System**:
 
