@@ -178,7 +178,7 @@ Tutto deve essere fatto in modo sicuro; il sistema deve mantenere l'isolamento t
 
 Ad esempio, sull'x86, un programma invoca una chiamata di sistema generando un'interruzione mediante l'istruzione `int`. Allo stesso modo, le eccezioni generano anch'esse un'interruzione. Pertanto, se il sistema operativo ha un piano per la gestione delle interruzioni, può gestire anche chiamate di sistema ed eccezioni.
 
-Una nota sulla terminologia: anche se il termine ufficiale x86 è eccezione, Xv6 utilizza il termine trap, principalmente perché era il termine utilizzato dal PDP11/40 ed è quindi il termine Unix convenzionale. É importante ricordare che le trap sono causate dal processo corrente in esecuzione su un processore (ad esempio, il processo effettua una chiamata di sistema e genera di conseguenza una trap), mentre le interruzioni sono causate dai dispositivi e potrebbero non essere correlate al processo in esecuzione al momento dell'interruzione.
+*Una nota sulla terminologia*: anche se il termine ufficiale x86 è eccezione, Xv6 utilizza il termine trap, principalmente perché era il termine utilizzato dal PDP11/40 ed è quindi il termine Unix convenzionale. É importante ricordare che le trap sono causate dal processo corrente in esecuzione su un processore (ad esempio, il processo effettua una chiamata di sistema e genera di conseguenza una trap), mentre le interruzioni sono causate dai dispositivi e potrebbero non essere correlate al processo in esecuzione al momento dell'interruzione.
 
 Il file `user/usertrap.S` contiene la traccia dei segnali di fault. Ciò permette di rispondere ai segnali di fault generati dai processi. 
 Il kernel chiama la funzione `trap_handler()` passando come parametro lo stato del processore.
@@ -206,7 +206,7 @@ Tvinit gestisce in modo particolare T_SYSCALL, la trap di chiamata di sistema de
 
 Per effettuare una chiamata di sistema sull'x86, un programma richiama l'istruzione int n, dove specifica l'indice nell'IDT. L'istruzione int esegue i seguenti passaggi:
 
-- Recupera l'ennesimo descrittore dall'IDT, dove n è l'argomento di int.
+- Recupera l'n-esimo descrittore dall'IDT, dove n è l'argomento di int.
 - Verificare che CPL(Current Privilege Level) in %cs sia <= DPL, dove DPL è il livello di privilegio nel descrittore.
 - Salva %esp e %ss in registri interni alla CPU, ma solo se PL < CPL del selettore del segmento target.
 - Carica %ss e %esp da un descrittore di segmento di attività.
